@@ -1,118 +1,206 @@
-//
-//  LiveHelperView.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
 import SwiftUI
 import UIKit
 
 struct LiveHelperView: View {
     @StateObject private var viewModel = LiveHelperViewModel()
+    @State private var isAnimating = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                VStack(spacing: 20) {
-                    // Input Methods
+                // Background
+                AppTheme.gradient
+                    .opacity(0.1)
+                    .ignoresSafeArea()
+                
+                // Main Content
+                VStack(spacing: 25) {
+                    // Mode Selection Card
                     inputMethodsCard
+                        .offset(y: isAnimating ? 0 : -30)
                     
                     // Question Display
                     questionCard
+                        .offset(y: isAnimating ? 0 : 30)
                     
                     Spacer()
                     
                     // Control Buttons
                     controlButtons
+                        .offset(y: isAnimating ? 0 : 50)
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top)
                 
-                // Processing Overlay
+                // Overlays
                 if viewModel.isProcessing {
                     ProcessingOverlay()
                 }
                 
-                // Answer Sheet
                 if viewModel.showingAnswer {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
                     AnswerSheet(answer: viewModel.answer) {
                         viewModel.showingAnswer = false
                     }
                 }
             }
             .navigationTitle("Live Interview Help")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: showHelp) {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundColor(AppTheme.primary)
+                    }
+                }
+            }
             .sheet(isPresented: $viewModel.showingCamera) {
                 ImageCaptureView { image in
                     viewModel.processImage(image)
                 }
             }
+            .alert("Error", isPresented: $viewModel.showError) {
+                Button("OK") {
+                    viewModel.showError = false
+                }
+            } message: {
+                Text(viewModel.errorMessage ?? "An error occurred")
+            }
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                isAnimating = true
+            }
         }
     }
     
     private var inputMethodsCard: some View {
-        HStack(spacing: 20) {
-            // Voice Input Button
-            InputMethodButton(
-                icon: "waveform.circle.fill",
-                title: "Voice",
-                isActive: viewModel.isRecording,
-                action: {
-                    viewModel.isRecording ? viewModel.stopRecording() : viewModel.startRecording()
-                }
-            )
+        VStack(spacing: 15) {
+            Text("Choose Input Method")
+                .font(.headline)
+                .foregroundColor(AppTheme.text)
             
-            // Camera Input Button
-            InputMethodButton(
-                icon: "camera.circle.fill",
-                title: "Photo",
-                isActive: false,
-                action: {
+            HStack(spacing: 20) {
+                InputMethodButton(
+                    icon: "waveform.circle.fill",
+                    title: "Voice",
+                    subtitle: "Record question",
+                    isActive: viewModel.isRecording
+                ) {
+                    if viewModel.isRecording {
+                        viewModel.stopRecording()
+                    } else {
+                        viewModel.startRecording()
+                    }
+                }
+                
+                InputMethodButton(
+                    icon: "camera.circle.fill",
+                    title: "Photo",
+                    subtitle: "Capture text",
+                    isActive: false
+                ) {
                     viewModel.showingCamera = true
                 }
-            )
+            }
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 15)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white)
-                .shadow(radius: 5)
+                .shadow(color: AppTheme.shadowLight, radius: 10)
+        )
+    }
+    private var questionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Question")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.text)
+                
+                Spacer()
+                
+                if !viewModel.capturedText.isEmpty {
+                    Button("Clear") {
+                        viewModel.clearState()
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.secondary)
+                }
+            }
+            
+            Text(viewModel.capturedText.isEmpty ? "Your question will appear here..." : viewModel.capturedText)
+                .font(.body)
+                .foregroundColor(viewModel.capturedText.isEmpty ? .gray : AppTheme.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 100)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(AppTheme.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(AppTheme.primary.opacity(0.1), lineWidth: 1)
+                )
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: AppTheme.shadowLight, radius: 10)
         )
     }
     
-    private var questionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Question")
-                .font(.headline)
-                .foregroundColor(.gray)
+    private var controlButtons: some View {
+        VStack(spacing: 20) {
+            if viewModel.isRecording {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .opacity(isAnimating ? 1 : 0.3)
+                        .animation(.easeInOut(duration: 0.5).repeatForever(), value: isAnimating)
+                    
+                    Text("Recording...")
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                }
+            }
             
-            Text(viewModel.capturedText.isEmpty ? "Question will appear here..." : viewModel.capturedText)
-                .font(.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 100)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.gray.opacity(0.1))
-                )
+            ModernCircleButton(
+                icon: viewModel.isRecording ? "stop.fill" : "mic.fill",
+                color: viewModel.isRecording ? .red : AppTheme.primary,
+                size: 70
+            ) {
+                if viewModel.isRecording {
+                    viewModel.stopRecording()
+                } else {
+                    viewModel.startRecording()
+                }
+            }
         }
+        .padding(.bottom, 30)
     }
     
-    private var controlButtons: some View {
-        HStack(spacing: 30) {
-            if viewModel.isRecording {
-                // Stop Button
-                CircleButton(
-                    icon: "stop.fill",
-                    color: .red,
-                    action: { viewModel.stopRecording() }
-                )
-            } else {
-                // Record Button
-                CircleButton(
-                    icon: "mic.fill",
-                    color: AppTheme.primary,
-                    action: { viewModel.startRecording() }
-                )
-            }
+    private func showHelp() {
+        let alert = UIAlertController(
+            title: "Live Interview Help",
+            message: """
+                • Tap the microphone to start recording a question
+                • Use the camera to capture written questions
+                • Get instant help with your responses
+                • Clear button removes current question
+                """,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Got it!", style: .default))
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.present(alert, animated: true)
         }
     }
 }
@@ -120,26 +208,50 @@ struct LiveHelperView: View {
 struct InputMethodButton: View {
     let icon: String
     let title: String
+    let subtitle: String
     let isActive: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 30))
-                Text(title)
-                    .font(.caption)
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(isActive ? AppTheme.primary.opacity(0.1) : AppTheme.surface)
+                        .frame(width: 60, height: 60)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(isActive ? AppTheme.primary : AppTheme.text)
+                }
+                
+                VStack(spacing: 2) {
+                    Text(title)
+                        .font(.callout)
+                        .fontWeight(.medium)
+                    
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                }
             }
-            .frame(width: 80, height: 80)
-            .foregroundColor(isActive ? .red : AppTheme.primary)
+            .frame(width: 120)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(Color.white)
+                    .shadow(color: isActive ? AppTheme.primary.opacity(0.2) : AppTheme.shadowLight,
+                           radius: isActive ? 8 : 5)
+            )
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
-struct CircleButton: View {
+struct ModernCircleButton: View {
     let icon: String
     let color: Color
+    let size: CGFloat
     let action: () -> Void
     
     var body: some View {
@@ -147,14 +259,16 @@ struct CircleButton: View {
             ZStack {
                 Circle()
                     .fill(color)
-                    .frame(width: 70, height: 70)
-                    .shadow(radius: 5)
+                    .frame(width: size, height: size)
+                    .shadow(color: color.opacity(0.3),
+                           radius: 10, x: 0, y: 5)
                 
                 Image(systemName: icon)
-                    .font(.title)
+                    .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundColor(.white)
             }
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
@@ -164,61 +278,84 @@ struct AnswerSheet: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Handle
             RoundedRectangle(cornerRadius: 2.5)
-                .fill(Color.gray.opacity(0.5))
+                .fill(Color.gray.opacity(0.3))
                 .frame(width: 40, height: 5)
                 .padding(.top)
             
             ScrollView {
                 Text(answer)
+                    .font(.body)
+                    .lineSpacing(5)
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            Button("Done") {
-                dismiss()
+            HStack(spacing: 15) {
+                Button("Copy") {
+                    UIPasteboard.general.string = answer
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(PrimaryButtonStyle())
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.primary)
+            .padding(.bottom)
         }
+        .padding()
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 25)
-                .fill(Color.white)
-                .ignoresSafeArea()
-        )
-        .transition(.move(edge: .bottom))
+        .background(Color.white)
+        .cornerRadius(25, corners: [.topLeft, .topRight])
     }
 }
 
-struct ImageCaptureView: UIViewControllerRepresentable {
-    let onCapture: (UIImage) -> Void
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .camera
-        return picker
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
     }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
     
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onCapture: onCapture)
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
     }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let onCapture: (UIImage) -> Void
-        
-        init(onCapture: @escaping (UIImage) -> Void) {
-            self.onCapture = onCapture
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                onCapture(image)
-            }
-            picker.dismiss(animated: true)
-        }
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.medium)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 12)
+            .background(AppTheme.primary)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+    }
+}
+
+struct SecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.medium)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 12)
+            .background(AppTheme.surface)
+            .foregroundColor(AppTheme.text)
+            .cornerRadius(12)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+    }
+}
+
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
     }
 }

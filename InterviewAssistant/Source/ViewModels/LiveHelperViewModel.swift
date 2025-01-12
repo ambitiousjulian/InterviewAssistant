@@ -11,6 +11,8 @@ class LiveHelperViewModel: ObservableObject {
     @Published var answer = ""
     @Published var showingCamera = false
     @Published var showingAnswer = false
+    @Published var errorMessage: String?
+    @Published var showError = false
     
     private var audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -19,16 +21,41 @@ class LiveHelperViewModel: ObservableObject {
     
     func startRecording() {
         guard !isRecording else { return }
-        setupAudioSession()
-        setupRecognition()
-        isRecording = true
+        
+        checkPermissions { [weak self] granted in
+            guard let self = self else { return }
+            if granted {
+                DispatchQueue.main.async {
+                    self.setupAudioSession()
+                    self.setupRecognition()
+                    self.isRecording = true
+                }
+            } else {
+                self.showPermissionError()
+            }
+        }
     }
     
     func stopRecording() {
         audioEngine.stop()
         recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        
         isRecording = false
-        processQuestion()
+        if !capturedText.isEmpty {
+            processQuestion()
+        }
+    }
+    
+    func clearState() {
+        capturedText = ""
+        answer = ""
+        isProcessing = false
+        showingAnswer = false
+        errorMessage = nil
+        showError = false
     }
     
     private func setupAudioSession() {
@@ -37,21 +64,28 @@ class LiveHelperViewModel: ObservableObject {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Failed to setup audio session: \(error.localizedDescription)")
+            handleError("Failed to setup audio: \(error.localizedDescription)")
         }
     }
     
     private func setupRecognition() {
-        // Cancel any existing task
         recognitionTask?.cancel()
         recognitionTask = nil
+        recognitionRequest = nil
         
-        // Create recognition request
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            handleError("Speech recognition is not available")
+            return
+        }
+        
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else { return }
+        guard let recognitionRequest = recognitionRequest else {
+            handleError("Unable to create recognition request")
+            return
+        }
+        
         recognitionRequest.shouldReportPartialResults = true
         
-        // Configure audio engine input
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
@@ -59,59 +93,97 @@ class LiveHelperViewModel: ObservableObject {
             self?.recognitionRequest?.append(buffer)
         }
         
-        // Start recognition task
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
             
             if let result = result {
-                self.capturedText = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
+                    self.capturedText = result.bestTranscription.formattedString
+                }
             }
             
-            if error != nil {
-                self.stopRecording()
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.handleError(error.localizedDescription)
+                    self.stopRecording()
+                }
             }
         }
         
-        // Prepare and start audio engine
         audioEngine.prepare()
         do {
             try audioEngine.start()
         } catch {
-            print("Failed to start audio engine: \(error.localizedDescription)")
+            handleError("Failed to start recording: \(error.localizedDescription)")
         }
     }
     
     func processImage(_ image: UIImage) {
         isProcessing = true
-        // Simulate processing for now
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.processQuestion()
+        // For MVP, simulate processing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.processQuestion()
         }
     }
     
     private func processQuestion() {
+        guard !capturedText.isEmpty else {
+            handleError("No question detected")
+            return
+        }
+        
         isProcessing = true
-        // Simulate processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.answer = "Sample answer to demonstrate the interview response format..."
+        // For MVP, simulate processing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
+            self.answer = """
+                Here's how you might answer this question:
+                
+                Key Points:
+                • Structure your response using the STAR method
+                • Focus on specific, relevant examples
+                • Keep your answer concise and professional
+                
+                Sample Response:
+                [Your generated response would go here...]
+                """
             self.isProcessing = false
             self.showingAnswer = true
         }
     }
     
-    // Add permission checking
     func checkPermissions(completion: @escaping (Bool) -> Void) {
-        SFSpeechRecognizer.requestAuthorization { status in
-            DispatchQueue.main.async {
-                let isAuthorized = status == .authorized
-                completion(isAuthorized)
-            }
+        let group = DispatchGroup()
+        var microphoneGranted = false
+        var speechGranted = false
+        
+        group.enter()
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            microphoneGranted = granted
+            group.leave()
         }
         
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            DispatchQueue.main.async {
-                completion(granted)
-            }
+        group.enter()
+        SFSpeechRecognizer.requestAuthorization { status in
+            speechGranted = (status == .authorized)
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            completion(microphoneGranted && speechGranted)
+        }
+    }
+    
+    private func showPermissionError() {
+        handleError("Please enable microphone and speech recognition in Settings")
+    }
+    
+    private func handleError(_ message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.errorMessage = message
+            self?.showError = true
+            self?.isProcessing = false
+            self?.isRecording = false
         }
     }
 }
