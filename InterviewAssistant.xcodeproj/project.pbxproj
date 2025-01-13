@@ -10,6 +10,7 @@
 		B99C2AE12D341A87006026DD /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE02D341A87006026DD /* FirebaseAuth */; };
 		B99C2AE32D341A87006026DD /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE22D341A87006026DD /* FirebaseFirestore */; };
 		B99C2AE52D341A87006026DD /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE42D341A87006026DD /* FirebaseStorage */; };
+		B9CA90D12D35745500C3C406 /* .env in Resources */ = {isa = PBXBuildFile; fileRef = B9CA90D02D35745500C3C406 /* .env */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		B99C2AA02D34198E006026DD /* InterviewAssistant.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InterviewAssistant.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B99C2AB02D341991006026DD /* InterviewAssistantTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterviewAssistantTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B99C2ABA2D341991006026DD /* InterviewAssistantUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterviewAssistantUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B9CA90D02D35745500C3C406 /* .env */ = {isa = PBXFileReference; lastKnownFileType = text; path = .env; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -84,6 +86,7 @@
 		B99C2A972D34198E006026DD = {
 			isa = PBXGroup;
 			children = (
+				B9CA90D02D35745500C3C406 /* .env */,
 				B99C2AA22D34198E006026DD /* InterviewAssistant */,
 				B99C2AB32D341991006026DD /* InterviewAssistantTests */,
 				B99C2ABD2D341991006026DD /* InterviewAssistantUITests */,
@@ -227,6 +230,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B9CA90D12D35745500C3C406 /* .env in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -419,7 +423,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16;
+				IPHONEOS_DEPLOYMENT_TARGET = 17;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -449,7 +453,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16;
+				IPHONEOS_DEPLOYMENT_TARGET = 17;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
