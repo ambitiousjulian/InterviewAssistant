@@ -42,33 +42,10 @@ enum AnthropicError: LocalizedError {
 
 // MARK: - Response Models
 struct AnthropicResponse: Codable {
-    let id: String
-    let type: String
-    let role: String
-    let content: [MessageContent]
-    let model: String
-    let stopReason: String?
-    let usage: Usage
+    let content: [[String: String]]
     
-    enum CodingKeys: String, CodingKey {
-        case id, type, role, content, model
-        case stopReason = "stop_reason"
-        case usage
-    }
-}
-
-struct MessageContent: Codable {
-    let type: String
-    let text: String
-}
-
-struct Usage: Codable {
-    let inputTokens: Int
-    let outputTokens: Int
-    
-    enum CodingKeys: String, CodingKey {
-        case inputTokens = "input_tokens"
-        case outputTokens = "output_tokens"
+    private enum CodingKeys: String, CodingKey {
+        case content
     }
 }
 
@@ -76,7 +53,7 @@ struct Usage: Codable {
 final class AnthropicService {
     private let apiKey: String
     private let baseURL = "https://api.anthropic.com/v1/messages"
-    let systemPrompt = """
+    private let systemPrompt = """
     You are an elite interview coach specializing in preparing candidates for technical and behavioral interviews. Your goal is to help craft highly effective, professional, and concise answers tailored to interview success. When given an interview question:
 
     1. Identify the question type (e.g., behavioral, technical, situational, etc.) and provide a brief analysis.
@@ -112,6 +89,7 @@ final class AnthropicService {
             throw AnthropicError.invalidAPIKey
         }
         self.apiKey = key
+        print("✅ Initialized with API key starting with: \(key.prefix(15))...")
     }
     
     // MARK: - API Methods
@@ -120,20 +98,19 @@ final class AnthropicService {
             throw AnthropicError.invalidURL
         }
         
+        print("🔵 Preparing request for question: \(question)")
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("anthropic-version: 2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "x-api-key")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         
         let payload: [String: Any] = [
             "model": "claude-3-sonnet-20240229",
             "max_tokens": maxTokens,
+            "system": systemPrompt,
             "messages": [
-                [
-                    "role": "system",
-                    "content": systemPrompt
-                ],
                 [
                     "role": "user",
                     "content": "Help me answer this interview question professionally: \(question)"
@@ -141,6 +118,7 @@ final class AnthropicService {
             ]
         ]
         
+        print("📤 Sending request to Anthropic...")
         return try await performRequest(request: request, payload: payload)
     }
     
@@ -149,9 +127,16 @@ final class AnthropicService {
         var request = request
         
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+            let jsonData = try JSONSerialization.data(withJSONObject: payload)
+            request.httpBody = jsonData
+            
+            print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
             
             let (data, response) = try await URLSession.shared.data(for: request)
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📥 Raw response: \(responseString)")
+            }
             
             try validateResponse(response)
             
@@ -172,6 +157,8 @@ final class AnthropicService {
             throw AnthropicError.invalidResponse
         }
         
+        print("🔍 Response status code: \(httpResponse.statusCode)")
+        
         switch httpResponse.statusCode {
         case 200...299:
             return
@@ -188,22 +175,25 @@ final class AnthropicService {
     
     private func parseResponse(_ data: Data) throws -> AnthropicResponse {
         do {
-            return try JSONDecoder().decode(AnthropicResponse.self, from: data)
+            let response = try JSONDecoder().decode(AnthropicResponse.self, from: data)
+            print("✅ Successfully parsed response")
+            return response
         } catch {
+            print("❌ Failed to parse response: \(error)")
             throw AnthropicError.parseError(error.localizedDescription)
         }
     }
     
     private func formatResponse(_ response: AnthropicResponse) -> String {
-        return response.content.map { $0.text }.joined(separator: "\n")
+        let formattedResponse = response.content.compactMap { $0["text"] }.joined(separator: "\n")
+        print("📝 Formatted response length: \(formattedResponse.count)")
+        return formattedResponse
     }
     
     private func logError(_ error: Error) {
-        #if DEBUG
         print("🔴 Anthropic API Error: \(error.localizedDescription)")
         if let anthropicError = error as? AnthropicError {
             print("Type: \(String(describing: anthropicError))")
         }
-        #endif
     }
 }

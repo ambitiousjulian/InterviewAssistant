@@ -25,8 +25,21 @@ class LiveHelperViewModel: ObservableObject {
     // MARK: - Initialization
     init() {
         do {
+            // Debug check for .env file
+            if let path = Bundle.main.path(forResource: ".env", ofType: nil) {
+                print("✅ Found .env file")
+                if let key = ConfigurationManager.getEnvironmentVar("ANTHROPIC_API_KEY") {
+                    print("✅ Found API key: \(key.prefix(8))...")
+                } else {
+                    print("❌ No API key found in .env")
+                }
+            } else {
+                print("❌ No .env file found")
+            }
+            
             self.anthropicService = try AnthropicService()
         } catch {
+            print("❌ Anthropic Service Error: \(error.localizedDescription)")
             fatalError("Failed to initialize Anthropic service: \(error.localizedDescription)")
         }
     }
