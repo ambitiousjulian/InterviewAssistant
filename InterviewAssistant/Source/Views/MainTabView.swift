@@ -2,21 +2,29 @@ import SwiftUI
 import FirebaseAuth
 
 struct MainTabView: View {
-    @StateObject private var viewModel = InterviewViewModel()
-    
     var body: some View {
         TabView {
-            InterviewListView()
+            LiveHelperView()
                 .tabItem {
-                    Label("Interviews", systemImage: "video.fill")
+                    Label("Live Help", systemImage: "waveform.circle.fill")
+                }
+            
+            MockInterviewView()
+                .tabItem {
+                    Label("Practice", systemImage: "person.2.fill")
+                }
+            
+            HistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.fill")
                 }
             
             ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.fill")
-                }
+                            .tabItem {
+                                Label("Profile", systemImage: "person.circle.fill")
+                            }
         }
-        .accentColor(AppTheme.primary)
+        .tint(AppTheme.primary)
     }
 }
 
@@ -49,31 +57,5 @@ struct InterviewRowView: View {
                 .foregroundColor(.gray)
         }
         .padding(.vertical, 8)
-    }
-}
-
-struct ProfileView: View {
-    @State private var showingSignOutAlert = false
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Account") {
-                    Button("Sign Out") {
-                        showingSignOutAlert = true
-                    }
-                    .foregroundColor(.red)
-                }
-            }
-            .navigationTitle("Profile")
-        }
-        .alert("Sign Out", isPresented: $showingSignOutAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Sign Out", role: .destructive) {
-                try? Auth.auth().signOut()
-            }
-        } message: {
-            Text("Are you sure you want to sign out?")
-        }
     }
 }

@@ -17,9 +17,17 @@ struct InterviewAssistantApp: App {
     var body: some Scene {
         WindowGroup {
             if authViewModel.isAuthenticated {
-                MainTabView()
+                MainTabView().preferredColorScheme(.light)
+                // Additional force light mode at window level
+                .onAppear {
+                    UIWindow.appearance().overrideUserInterfaceStyle = .light
+                }
             } else {
-                LoginView()
+                LoginView().preferredColorScheme(.light)
+                // Additional force light mode at window level
+                .onAppear {
+                    UIWindow.appearance().overrideUserInterfaceStyle = .light
+                }
             }
         }
     }
