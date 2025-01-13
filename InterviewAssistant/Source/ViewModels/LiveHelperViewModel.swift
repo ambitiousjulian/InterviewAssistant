@@ -5,6 +5,7 @@ import Foundation
 import UIKit
 
 class LiveHelperViewModel: ObservableObject {
+    // MARK: - Published Properties
     @Published var isRecording = false
     @Published var capturedText = ""
     @Published var isProcessing = false
@@ -14,11 +15,23 @@ class LiveHelperViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var showError = false
     
+    // MARK: - Private Properties
+    private let anthropicService: AnthropicService
     private var audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     
+    // MARK: - Initialization
+    init() {
+        do {
+            self.anthropicService = try AnthropicService()
+        } catch {
+            fatalError("Failed to initialize Anthropic service: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Public Methods
     func startRecording() {
         guard !isRecording else { return }
         
@@ -36,26 +49,92 @@ class LiveHelperViewModel: ObservableObject {
         }
     }
     
-    func stopRecording() {
+    func dismissAnswer() {
+        showingAnswer = false
+        reset()
+    }
+    
+    func reset() {
+        // Clean up audio
         audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         recognitionRequest = nil
         recognitionTask?.cancel()
         recognitionTask = nil
         
-        isRecording = false
-        if !capturedText.isEmpty {
-            processQuestion()
+        // Reset audio session
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Failed to deactivate audio session: \(error)")
+        }
+        
+        // Reset state
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecording = false
+            self?.capturedText = ""
+            self?.isProcessing = false
+            self?.answer = ""
+            self?.showingAnswer = false
+            self?.errorMessage = nil
+            self?.showError = false
         }
     }
     
     func clearState() {
-        capturedText = ""
-        answer = ""
-        isProcessing = false
-        showingAnswer = false
-        errorMessage = nil
-        showError = false
+        reset()
+    }
+    
+    func stopRecording() {
+        guard isRecording else { return }
+        
+        audioEngine.stop()
+        recognitionRequest?.endAudio()
+        
+        isRecording = false
+        if !capturedText.isEmpty {
+            processQuestion()
+        } else {
+            reset()
+        }
+    }
+    
+    func processImage(_ image: UIImage) {
+        isProcessing = true
+        // For MVP, process the question directly
+        processQuestion()
+    }
+    
+    // MARK: - Private Methods
+    private func processQuestion() {
+        guard !capturedText.isEmpty else {
+            handleError("No question detected")
+            return
+        }
+        
+        isProcessing = true
+        
+        Task {
+            do {
+                let response = try await anthropicService.generateResponse(for: capturedText)
+                await MainActor.run {
+                    self.answer = response
+                    self.isProcessing = false
+                    self.showingAnswer = true
+                }
+            } catch let error as AnthropicError {
+                await MainActor.run {
+                    self.handleError(error.errorDescription ?? "An error occurred")
+                    self.isProcessing = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.handleError("Failed to generate response: \(error.localizedDescription)")
+                    self.isProcessing = false
+                }
+            }
+        }
     }
     
     private func setupAudioSession() {
@@ -115,40 +194,6 @@ class LiveHelperViewModel: ObservableObject {
             try audioEngine.start()
         } catch {
             handleError("Failed to start recording: \(error.localizedDescription)")
-        }
-    }
-    
-    func processImage(_ image: UIImage) {
-        isProcessing = true
-        // For MVP, simulate processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            self?.processQuestion()
-        }
-    }
-    
-    private func processQuestion() {
-        guard !capturedText.isEmpty else {
-            handleError("No question detected")
-            return
-        }
-        
-        isProcessing = true
-        // For MVP, simulate processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self = self else { return }
-            self.answer = """
-                Here's how you might answer this question:
-                
-                Key Points:
-                • Structure your response using the STAR method
-                • Focus on specific, relevant examples
-                • Keep your answer concise and professional
-                
-                Sample Response:
-                [Your generated response would go here...]
-                """
-            self.isProcessing = false
-            self.showingAnswer = true
         }
     }
     

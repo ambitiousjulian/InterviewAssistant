@@ -42,7 +42,7 @@ struct LiveHelperView: View {
                         .ignoresSafeArea()
                     
                     AnswerSheet(answer: viewModel.answer) {
-                        viewModel.showingAnswer = false
+                        viewModel.dismissAnswer()  // Use new method
                     }
                 }
             }
@@ -73,6 +73,9 @@ struct LiveHelperView: View {
             withAnimation(.easeOut(duration: 0.8)) {
                 isAnimating = true
             }
+        }
+        .onDisappear {
+            viewModel.reset()  // Clean up when view disappears
         }
     }
     
@@ -298,7 +301,9 @@ struct AnswerSheet: View {
                 .buttonStyle(SecondaryButtonStyle())
                 
                 Button("Done") {
-                    dismiss()
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        dismiss()
+                    }
                 }
                 .buttonStyle(PrimaryButtonStyle())
             }
