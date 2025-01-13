@@ -41,8 +41,8 @@ struct LiveHelperView: View {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                     
-                    AnswerSheet(answer: viewModel.answer) {
-                        viewModel.dismissAnswer()  // Use new method
+                    AnswerSheet(viewModel: viewModel) {
+                        viewModel.dismissAnswer()
                     }
                 }
             }
@@ -276,7 +276,9 @@ struct ModernCircleButton: View {
 }
 
 struct AnswerSheet: View {
-    let answer: String
+    @ObservedObject var viewModel: LiveHelperViewModel // Change to use ViewModel
+    @State private var isCopied = false
+
     let dismiss: () -> Void
     
     var body: some View {
@@ -287,27 +289,52 @@ struct AnswerSheet: View {
                 .padding(.top)
             
             ScrollView {
-                Text(answer)
+                Text(viewModel.currentResponse) // Use currentResponse instead of answer
                     .font(.body)
                     .lineSpacing(5)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(.easeOut(duration: 0.2), value: viewModel.currentResponse)
             }
             
-            HStack(spacing: 15) {
-                Button("Copy") {
-                    UIPasteboard.general.string = answer
-                }
-                .buttonStyle(SecondaryButtonStyle())
-                
-                Button("Done") {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        dismiss()
+            if viewModel.isStreaming {
+                // Show typing indicator while streaming
+                HStack(spacing: 4) {
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(AppTheme.primary)
+                            .frame(width: 6, height: 6)
+                            .opacity(0.5)
+                            .animation(
+                                Animation.easeInOut(duration: 0.6)
+                                    .repeatForever()
+                                    .delay(Double(index) * 0.2),
+                                value: viewModel.isStreaming
+                            )
                     }
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .padding(.bottom)
+            } else {
+                HStack(spacing: 15) {
+                    Button(isCopied ? "Copied!" : "Copy") {
+                            UIPasteboard.general.string = viewModel.currentResponse
+                            isCopied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                isCopied = false
+                            }
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .foregroundColor(isCopied ? .green : .primary)
+                    
+                    Button("Done") {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            dismiss()
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+                .padding(.bottom)
             }
-            .padding(.bottom)
         }
         .padding()
         .frame(maxWidth: .infinity)

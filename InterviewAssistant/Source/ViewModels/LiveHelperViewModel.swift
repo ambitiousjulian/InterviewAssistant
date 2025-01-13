@@ -14,6 +14,8 @@ class LiveHelperViewModel: ObservableObject {
     @Published var showingAnswer = false
     @Published var errorMessage: String?
     @Published var showError = false
+    @Published var currentResponse = ""
+    @Published var isStreaming = false
     
     // MARK: - Private Properties
     private let anthropicService: AnthropicService
@@ -38,6 +40,7 @@ class LiveHelperViewModel: ObservableObject {
             }
             
             self.anthropicService = try AnthropicService()
+            self.anthropicService.delegate = self  // Add this line
         } catch {
             print("❌ Anthropic Service Error: \(error.localizedDescription)")
             fatalError("Failed to initialize Anthropic service: \(error.localizedDescription)")
@@ -127,24 +130,17 @@ class LiveHelperViewModel: ObservableObject {
         }
         
         isProcessing = true
+        currentResponse = ""
+        isStreaming = true
         
         Task {
             do {
-                let response = try await anthropicService.generateResponse(for: capturedText)
-                await MainActor.run {
-                    self.answer = response
-                    self.isProcessing = false
-                    self.showingAnswer = true
-                }
-            } catch let error as AnthropicError {
-                await MainActor.run {
-                    self.handleError(error.errorDescription ?? "An error occurred")
-                    self.isProcessing = false
-                }
+                try await anthropicService.generateStreamingResponse(for: capturedText)
             } catch {
                 await MainActor.run {
                     self.handleError("Failed to generate response: \(error.localizedDescription)")
                     self.isProcessing = false
+                    self.isStreaming = false
                 }
             }
         }
@@ -243,5 +239,25 @@ class LiveHelperViewModel: ObservableObject {
             self?.isProcessing = false
             self?.isRecording = false
         }
+    }
+}
+
+// Add AnthropicServiceDelegate conformance
+extension LiveHelperViewModel: AnthropicServiceDelegate {
+    func anthropicService(_ service: AnthropicService, didReceiveContent content: String) {
+        currentResponse += content
+    }
+    
+    func anthropicServiceDidCompleteResponse(_ service: AnthropicService) {
+        isProcessing = false
+        isStreaming = false
+        answer = currentResponse
+        showingAnswer = true
+    }
+    
+    func anthropicService(_ service: AnthropicService, didEncounterError error: Error) {
+        handleError(error.localizedDescription)
+        isProcessing = false
+        isStreaming = false
     }
 }
