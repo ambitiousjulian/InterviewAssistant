@@ -8,41 +8,35 @@ Icon?
 .Trashes
 
 # Xcode
-xcuserdata/
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcworkspace/contents.xcworkspacedata
-**/xcshareddata/WorkspaceSettings.xcsettings
-DerivedData/
-.swiftpm/
-*.moved-aside
-*.pbxuser
-!default.pbxuser
-*.mode1v3
-!default.mode1v3
+xcuserdata/               # Ignore user-specific data
+*.pbxuser                 # Ignore personal project files
+*.mode1v3                 # Legacy Xcode user settings
 *.mode2v3
-!default.mode2v3
 *.perspectivev3
-!default.perspectivev3
-*.xcuserstate
-*.xcscmblueprint
-*.xccheckout
-*.xcodeproj
-*.xcworkspace
-!default.xcworkspace
+*.xcuserstate             # Ignore user workspace settings
+*.xccheckout              # Ignore source control metadata
+*.xcscmblueprint          # Ignore source control metadata
+
+# Ensure critical project files are NOT ignored
+!*.xcodeproj/project.pbxproj  # Keep project.pbxproj tracked
+!*.xcodeproj/xcshareddata/    # Keep shared data tracked
+!*.xcodeproj/xcshareddata/**  # Include all shared workspace settings
+!*.xcworkspace/contents.xcworkspacedata
 
 # Swift Package Manager
 .build/
-Package.resolved
+.swiftpm/
+Package.resolved          # Lock file for dependencies
+
+# Derived data
+DerivedData/
 
 # Firebase
 GoogleService-Info.plist
-firebase-debug.log
 .firebase/
 firebase-debug.*.log
 
-# Build
+# Build products
 build/
 *.ipa
 *.dSYM.zip
@@ -52,7 +46,7 @@ build/
 .env
 .env.*
 
-# Other
+# Logs and temporary files
 *.log
 *.swp
 *.lock
