@@ -74,7 +74,7 @@ final class AnthropicService {
     weak var delegate: AnthropicServiceDelegate?
     
     private let systemPrompt = """
-    You are an elite interview coach. Craft concise, professional, and impactful answers for technical and behavioral questions. Focus on clarity and relevance.
+    You are an elite interview coach. Craft concise, professional, and impactful answers for technical and behavioral questions. Focus on clarity and relevance. Keep total response with 512 max tokens.
 
     RESPONSE FORMAT:
 
@@ -82,7 +82,7 @@ final class AnthropicService {
     [Behavioral, technical, situational, etc.]
 
     SUGGESTED RESPONSE:
-    [Deliver a concise, polished answer. Use STAR for behavioral questions.]
+    [Deliver a concise, polished answer. Use STAR for behavioral questions. If it may be a coding question provide clean concise code with a brief explanation if there is room, prioritze a code response.]
     """
     //
     //    KEY POINTS:
@@ -123,14 +123,14 @@ final class AnthropicService {
         
         let payload: [String: Any] = [
             "model": "claude-3-sonnet-20240229",
-            "max_tokens": 300,
+            "max_tokens": 512,
             "temperature": 0.7,
             "stream": true,
             "system": systemPrompt,
             "messages": [
                 [
                     "role": "user",
-                    "content": "Help me answer this interview question sounding human and not like an ai bot, keep it very clear: \(question)"
+                    "content": "Help me answer this interview question sounding human and not like an ai bot, keep it very clear, and ensure to keep total response under 512 max tokens: \(question)"
                 ]
             ]
         ]
