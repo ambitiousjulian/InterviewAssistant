@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		92AA44552D37E040009F0194 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 92AA44542D37E040009F0194 /* GoogleService-Info.plist */; };
 		B99C2AE12D341A87006026DD /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE02D341A87006026DD /* FirebaseAuth */; };
 		B99C2AE32D341A87006026DD /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE22D341A87006026DD /* FirebaseFirestore */; };
 		B99C2AE52D341A87006026DD /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B99C2AE42D341A87006026DD /* FirebaseStorage */; };
@@ -31,6 +32,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		92AA44542D37E040009F0194 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B99C2AA02D34198E006026DD /* InterviewAssistant.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InterviewAssistant.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B99C2AB02D341991006026DD /* InterviewAssistantTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterviewAssistantTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B99C2ABA2D341991006026DD /* InterviewAssistantUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterviewAssistantUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,6 +88,7 @@
 		B99C2A972D34198E006026DD = {
 			isa = PBXGroup;
 			children = (
+				92AA44542D37E040009F0194 /* GoogleService-Info.plist */,
 				B9CA90D02D35745500C3C406 /* .env */,
 				B99C2AA22D34198E006026DD /* InterviewAssistant */,
 				B99C2AB32D341991006026DD /* InterviewAssistantTests */,
@@ -230,6 +233,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				92AA44552D37E040009F0194 /* GoogleService-Info.plist in Resources */,
 				B9CA90D12D35745500C3C406 /* .env in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
