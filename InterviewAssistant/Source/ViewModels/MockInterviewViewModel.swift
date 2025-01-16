@@ -242,12 +242,12 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         - [Specific improvement area with actionable suggestion]
         
         DETAILED_FEEDBACK:
-        Q1: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
-        Q2: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
-        Q3: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
-        Q4: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
-        Q5: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
-        Q6: [Score 1-10] | [Detailed feedback with specific examples and improvement suggestions]
+        Q1:[Score 1-10]|[Feedback for question 1]
+        Q2:[Score 1-10]|[Feedback for question 2]
+        Q3:[Score 1-10]|[Feedback for question 3]
+        Q4:[Score 1-10]|[Feedback for question 4]
+        Q5:[Score 1-10]|[Feedback for question 5]
+        Q6:[Score 1-10]|[Feedback for question 6]
         
         Base your analysis on:
         1. Role-specific competencies for \(interview.jobTitle)
@@ -408,8 +408,9 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         }
         
         let sections = response.components(separatedBy: "\n\n")
+        print("Found \(sections.count) sections")
         
-        // Parse overall score
+        // Parse overall score (keeping existing flexible parsing)
         var overallScore = 0
         if let scoreLine = sections.first(where: { $0.contains("OVERALL_SCORE:") }) {
             let scoreComponents = scoreLine.components(separatedBy: ":")
@@ -419,7 +420,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             }
         }
         
-        // Parse strengths
+        // Parse strengths (keeping existing flexible parsing)
         var strengths: [String] = []
         if let strengthsSection = sections.first(where: { $0.contains("STRENGTHS:") }) {
             strengths = strengthsSection
@@ -428,7 +429,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
                 .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "- ")) }
         }
         
-        // Parse improvements
+        // Parse improvements (keeping existing flexible parsing)
         var improvements: [String] = []
         if let improvementsSection = sections.first(where: { $0.contains("IMPROVEMENTS:") }) {
             improvements = improvementsSection
@@ -437,31 +438,68 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
                 .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "- ")) }
         }
         
-        // Parse detailed feedback
+        // Parse detailed feedback with new strict parsing
         var detailedFeedback: [QuestionFeedback] = []
         if let feedbackSection = sections.first(where: { $0.contains("DETAILED_FEEDBACK:") }) {
+            print("\nProcessing DETAILED_FEEDBACK section:")
+            print(feedbackSection)
+            
+            // Split into lines and process only the Q lines
             let feedbackLines = feedbackSection
-                .components(separatedBy: "\n")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .components(separatedBy: .newlines)
                 .filter { $0.starts(with: "Q") }
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            
+            print("\nFound \(feedbackLines.count) feedback lines:")
+            feedbackLines.forEach { print($0) }
             
             for line in feedbackLines {
-                let parts = line.split(separator: "|", maxSplits: 1).map(String.init)
-                guard parts.count == 2 else { continue }
+                // Match the exact format: Q1:[Score]|[Feedback]
+                let components = line.components(separatedBy: "|")
+                guard components.count == 2 else { continue }
                 
-                let questionScorePart = parts[0].trimmingCharacters(in: .whitespaces)
-                let feedbackText = parts[1].trimmingCharacters(in: .whitespaces)
+                let scoreComponent = components[0].trimmingCharacters(in: .whitespaces)
+                let feedback = components[1].trimmingCharacters(in: .whitespaces)
                 
-                if let questionNumber = extractQuestionNumber(from: questionScorePart),
-                   let score = extractScore(from: questionScorePart) {
+                // Extract question number and score from Q1:[Score]
+                if let questionNumber = Int(scoreComponent.dropFirst().prefix(1)),
+                   let score = Int(scoreComponent.components(separatedBy: ":")[1].trimmingCharacters(in: .whitespaces)) {
+                    
+                    print("Processing Q\(questionNumber) - Score: \(score)")
+                    
                     detailedFeedback.append(QuestionFeedback(
                         questionIndex: questionNumber - 1,
                         score: score,
-                        feedback: feedbackText
+                        feedback: feedback
                     ))
                 }
             }
             
+            // Sort by question index
+            detailedFeedback.sort { $0.questionIndex < $1.questionIndex }
+            
+            print("\nProcessed Feedback Summary:")
+            detailedFeedback.forEach { feedback in
+                print("Q\(feedback.questionIndex + 1): Score \(feedback.score)")
+            }
+        }
+        
+        // Ensure we have all 6 feedback items
+        if detailedFeedback.count != 6 {
+            print("Warning: Expected 6 feedback items, found \(detailedFeedback.count)")
+            
+            // Add missing feedback items
+            for i in 0..<6 {
+                if !detailedFeedback.contains(where: { $0.questionIndex == i }) {
+                    detailedFeedback.append(QuestionFeedback(
+                        questionIndex: i,
+                        score: 0,
+                        feedback: "No feedback provided for Question \(i + 1)"
+                    ))
+                }
+            }
+            
+            // Sort again after adding missing items
             detailedFeedback.sort { $0.questionIndex < $1.questionIndex }
         }
         
@@ -472,6 +510,12 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             improvements: improvements,
             detailedFeedback: detailedFeedback
         )
+        
+        print("\nFinal Analysis Summary:")
+        print("Overall Score: \(analysis.overallScore)")
+        print("Strengths: \(analysis.strengths.count)")
+        print("Improvements: \(analysis.improvements.count)")
+        print("Detailed Feedback: \(analysis.detailedFeedback.count)")
         
         interview.analysis = analysis
         self.interview = interview
