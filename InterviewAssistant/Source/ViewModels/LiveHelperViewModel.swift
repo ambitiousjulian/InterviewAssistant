@@ -2,6 +2,8 @@ import SwiftUI
 import AVFoundation
 import Speech
 import Foundation
+import Vision
+import VisionKit
 import UIKit
 
 class LiveHelperViewModel: ObservableObject {
@@ -117,9 +119,59 @@ class LiveHelperViewModel: ObservableObject {
     }
     
     func processImage(_ image: UIImage) {
-        isProcessing = true
-        // For MVP, process the question directly
-        processQuestion()
+        DispatchQueue.main.async {
+            self.isProcessing = true  // Set to true immediately when processing starts
+        }
+        
+        guard let cgImage = image.cgImage else {
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                self.handleError("Failed to process image")
+            }
+            return
+        }
+        
+        let requestHandler = VNImageRequestHandler(cgImage: cgImage)
+        let request = VNRecognizeTextRequest { [weak self] request, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.isProcessing = false
+                    self.handleError("Text recognition failed: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let observations = request.results as? [VNRecognizedTextObservation] else {
+                    self.isProcessing = false
+                    self.handleError("No text found in image")
+                    return
+                }
+                
+                let recognizedText = observations.compactMap { observation in
+                    observation.topCandidates(1).first?.string
+                }.joined(separator: " ")
+                
+                self.capturedText = recognizedText
+                if !recognizedText.isEmpty {
+                    self.processQuestion()
+                } else {
+                    self.isProcessing = false
+                    self.handleError("No text detected in image")
+                }
+            }
+        }
+        
+        request.recognitionLevel = .accurate
+        
+        do {
+            try requestHandler.perform([request])
+        } catch {
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                self.handleError("Failed to process image: \(error.localizedDescription)")
+            }
+        }
     }
     
     // MARK: - Private Methods

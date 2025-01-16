@@ -68,7 +68,7 @@ struct LoginView: View {
                 .foregroundStyle(.white)
                 .symbolEffect(.bounce, options: .repeating)
             
-            Text(isRegistering ? "Create Account" : "Welcome Back")
+            Text(isRegistering ? "Create Account" : "Fuck Interviews AI")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.white)
         }

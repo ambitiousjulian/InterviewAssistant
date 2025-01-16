@@ -46,7 +46,7 @@ struct LiveHelperView: View {
                     }
                 }
             }
-            .navigationTitle("Live Interview Help")
+            .navigationTitle("Fuck Interviews AI")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -190,7 +190,7 @@ struct LiveHelperView: View {
     
     private func showHelp() {
         let alert = UIAlertController(
-            title: "Live Interview Help",
+            title: "Fuck Interviews AI",
             message: """
                 • Tap the microphone to start recording a question
                 • Use the camera to capture written questions
