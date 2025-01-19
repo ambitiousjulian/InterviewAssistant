@@ -14,10 +14,10 @@ struct MainTabView: View {
                     Label("Practice", systemImage: "person.2.fill")
                 }
             
-            HistoryView()
-                .tabItem {
-                    Label("History", systemImage: "clock.fill")
-                }
+//            HistoryView()
+//                .tabItem {
+//                    Label("History", systemImage: "clock.fill")
+//                }
             
             ProfileView()
                             .tabItem {

@@ -4,8 +4,16 @@
 //
 //  Created by Julian Cajuste on 1/12/25.
 //
+//
+//  AnthropicService.swift
+//  InterviewAssistant
+//
+//  Created by Julian Cajuste on 1/12/25.
+//
 
 import Foundation
+import NaturalLanguage
+import UIKit
 
 // MARK: - Protocols
 protocol AnthropicServiceDelegate: AnyObject {
@@ -49,18 +57,7 @@ enum AnthropicError: LocalizedError {
 
 // MARK: - Response Models
 struct StreamChunk: Codable {
-    let type: String?
-    let message: Message?
     let delta: Delta?
-}
-
-struct Message: Codable {
-    let content: [Content]?
-}
-
-struct Content: Codable {
-    let text: String?
-    let type: String?
 }
 
 struct Delta: Codable {
@@ -74,40 +71,31 @@ final class AnthropicService {
     weak var delegate: AnthropicServiceDelegate?
     
     private let systemPrompt = """
-    You are an elite interview coach. Craft concise, professional, and impactful answers for technical and behavioral questions. Focus on clarity and relevance. Keep total response with 512 max tokens.
-
-    RESPONSE FORMAT:
+    You are an expert interviewer and career coach for all fields and positions, including technical, creative, and business roles. When answering questions:
+    - Adapt your response to the specific field and position context.
+    - Use clear, concise, and impactful language relevant to the question.
+    - Interpret ambiguous terms or incomplete questions in context, ensuring the most likely intended meaning is addressed.
+    - Avoid unnecessary reasoning or apologies and directly provide the best possible answer.
 
     QUESTION TYPE:
-    [Behavioral, technical, situational, etc.]
+    [Behavioral, technical, situational, creative, leadership, etc.]
 
     SUGGESTED RESPONSE:
-    [Deliver a concise, polished answer. Use STAR for behavioral questions. If it may be a coding question provide clean concise code with a brief explanation if there is room, prioritze a code response.]
+    [Provide a clear, concise, and professional response tailored to the specific field and position. Use STAR for behavioral questions. For technical fields, focus on accuracy and clarity. For creative roles, emphasize innovation and unique approaches. Keep responses under 512 tokens.]
     """
-    //
-    //    KEY POINTS:
-    //    - [Key Point 1]
-    //    - [Key Point 2]
-    //
-    //    TIPS:
-    //    - [Practical improvement tip]
-    //    - [Advice on tone or delivery]
-    //
-    //    TONE:
-    //    Confident, professional, and human-like—never robotic.
-    
+
     // MARK: - Initialization
     init() throws {
-        guard let key = ConfigurationManager.getEnvironmentVar("ANTHROPIC_API_KEY"),
-              !key.isEmpty else {
+        guard let key = ConfigurationManager.getEnvironmentVar("ANTHROPIC_API_KEY"), !key.isEmpty else {
             throw AnthropicError.invalidAPIKey
         }
         self.apiKey = key
-        print("✅ Initialized with API key starting with: \(key.prefix(15))...")
     }
     
     // MARK: - API Methods
     func generateStreamingResponse(for question: String) async {
+        let cleanedQuestion = cleanAndDisambiguateInput(question)
+        
         guard let url = URL(string: baseURL) else {
             delegate?.anthropicService(self, didEncounterError: AnthropicError.invalidURL)
             return
@@ -118,11 +106,10 @@ final class AnthropicService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("true", forHTTPHeaderField: "stream")
-        request.timeoutInterval = 30
+        request.timeoutInterval = 20
         
         let payload: [String: Any] = [
-            "model": "claude-3-sonnet-20240229",
+            "model": "claude-3-haiku-20240307",
             "max_tokens": 512,
             "temperature": 0.7,
             "stream": true,
@@ -130,54 +117,60 @@ final class AnthropicService {
             "messages": [
                 [
                     "role": "user",
-                    "content": "Help me answer this interview question sounding human and not like an ai bot, keep it very clear, and ensure to keep total response under 512 max tokens: \(question)"
+                    "content": """
+                    Provide a concise and tailored response for this interview question. Focus on the relevant field, position, and context, ensuring the answer is impactful and aligns with industry expectations, while keeping a casual tone. Speak in first person, like you are the one being interviewed: \(cleanedQuestion)
+                    """
                 ]
             ]
         ]
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-            
             let (stream, response) = try await URLSession.shared.bytes(for: request)
             
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 throw AnthropicError.invalidResponse
             }
             
             for try await line in stream.lines {
-                guard !line.isEmpty else { continue }
-                if line.hasPrefix("data: "),
-                   let data = line.dropFirst(6).data(using: .utf8) {
-                    do {
-                        let chunk = try JSONDecoder().decode(StreamChunk.self, from: data)
-                        if let content = chunk.delta?.text {
-                            await MainActor.run {
-                                delegate?.anthropicService(self, didReceiveContent: content)
-                            }
-                        }
-                    } catch {
-                        print("Failed to decode chunk: \(error)")
+                if line.starts(with: "data: "), let data = line.dropFirst(6).data(using: .utf8) {
+                    if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
+                       let content = chunk.delta?.text {
+                        await MainActor.run { delegate?.anthropicService(self, didReceiveContent: content) }
                     }
                 }
             }
             
-            await MainActor.run {
-                delegate?.anthropicServiceDidCompleteResponse(self)
-            }
-            
+            await MainActor.run { delegate?.anthropicServiceDidCompleteResponse(self) }
         } catch {
-            await MainActor.run {
-                delegate?.anthropicService(self, didEncounterError: error)
-            }
+            await MainActor.run { delegate?.anthropicService(self, didEncounterError: error) }
         }
     }
     
-    // MARK: - Error Handling
-    private func logError(_ error: Error) {
-        print("🔴 Anthropic API Error: \(error.localizedDescription)")
-        if let anthropicError = error as? AnthropicError {
-            print("Type: \(String(describing: anthropicError))")
+    // MARK: - Input Cleaning
+    private func cleanAndDisambiguateInput(_ input: String) -> String {
+        let spellChecker = UITextChecker()
+        let words = input.split(separator: " ")
+        var correctedWords: [String] = []
+        
+        for word in words {
+            let range = NSRange(location: 0, length: word.count)
+            let misspelledRange = spellChecker.rangeOfMisspelledWord(
+                in: String(word),
+                range: range,
+                startingAt: 0,
+                wrap: false,
+                language: "en"
+            )
+            
+            if misspelledRange.location != NSNotFound {
+                let guesses = spellChecker.guesses(forWordRange: misspelledRange, in: String(word), language: "en") ?? []
+                correctedWords.append(guesses.first ?? String(word))
+            } else {
+                correctedWords.append(String(word))
+            }
         }
+        
+        return correctedWords.joined(separator: " ")
     }
 }

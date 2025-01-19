@@ -23,7 +23,8 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
     @Published var currentGeneratedContent: String = ""
     @Published var experienceLevel: ExperienceLevel = .entry
     @Published var showingEndInterviewAlert = false
-    
+    private var isResetting = false
+
     // MARK: - Private Properties
     private let anthropicService: AnthropicService
     
@@ -93,13 +94,25 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
     
     // MARK: - Interview Methods
     func startInterview() {
-        print("Start Interview button clicked") // Debug: Check if button press is registered
-        guard canStartInterview else {
-            print("Cannot start interview: jobTitle is empty or invalid") // Debug: Check if validation fails
+        print("Start Interview button clicked")
+            
+        // Prevent starting new interview while resetting
+        guard !isResetting else {
+            print("Cannot start interview while resetting")
             return
         }
         
-        print("Starting interview setup...") // Debug: Confirm interview setup begins
+        guard canStartInterview else {
+            print("Cannot start interview: jobTitle is empty or invalid")
+            return
+        }
+        
+        // Reset interview-specific state
+        interview = nil
+        currentResponse = ""
+        currentGeneratedContent = ""
+        
+        print("Starting interview setup...")
         isLoading = true
         currentState = .setup
         
@@ -131,13 +144,11 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         
         Task {
             do {
-                print("Calling AnthropService to generate questions...") // Debug: Indicate async call starts
                 try await anthropicService.generateStreamingResponse(for: prompt)
-                print("Questions generated successfully") // Debug: Confirm success
             } catch {
                 await MainActor.run {
                     self.isLoading = false
-                    print("Error generating questions: \(error)") // Debug: Print any error
+                    print("Error generating questions: \(error)")
                 }
             }
         }
@@ -147,6 +158,9 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
     func submitResponse() {
         print("\n=== SUBMITTING RESPONSE ===")
         
+        // Get trimmed response
+        let trimmedResponse = currentResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        
         guard var interview = interview else {
             print("Error: No active interview found")
             return
@@ -154,40 +168,67 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         
         print("Current question index: \(interview.currentQuestionIndex)")
         print("Total questions: \(interview.questions.count)")
-        print("Current response length: \(currentResponse.count)")
         
-        // Validate current index and response
+        // Validate current index
         guard interview.currentQuestionIndex >= 0,
-              interview.currentQuestionIndex < interview.questions.count,
-              !currentResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("Error: Invalid question index or empty response")
+              interview.currentQuestionIndex < interview.questions.count else {
+            print("Error: Invalid question index")
             return
         }
         
         // Update the response for the current question
         if interview.currentQuestionIndex < interview.responses.count {
-            interview.responses[interview.currentQuestionIndex] = currentResponse
+            interview.responses[interview.currentQuestionIndex] = trimmedResponse
         } else {
-            interview.responses.append(currentResponse)
+            interview.responses.append(trimmedResponse)
         }
         print("Response saved successfully")
+        
+        // Clear current response BEFORE moving to next question
+        self.currentResponse = ""
         
         // Move to next question or finish
         if interview.currentQuestionIndex < interview.questions.count - 1 {
             interview.currentQuestionIndex += 1
             print("Moving to question \(interview.currentQuestionIndex + 1)")
             self.interview = interview
-            currentResponse = ""
         } else {
             print("All questions completed, moving to analysis")
-            currentState = .reviewing
             self.interview = interview
-            analyzeInterview()
+            DispatchQueue.main.async {
+                self.currentState = .reviewing
+                self.analyzeInterview()
+            }
         }
         
         print("=== RESPONSE SUBMISSION COMPLETE ===\n")
     }
 
+    private func generateFallbackAnalysis() -> InterviewAnalysis {
+        return InterviewAnalysis(
+            overallScore: 5,
+            strengths: [
+                "Shows basic understanding of the role",
+                "Demonstrates willingness to learn",
+                "Communicates clearly"
+            ],
+            improvements: [
+                "Provide more specific examples",
+                "Elaborate on technical knowledge",
+                "Focus on quantifiable results"
+            ],
+            detailedFeedback: generateDefaultFeedback()
+        )
+    }
+    private func generateDefaultFeedback() -> [QuestionFeedback] {
+        return (0...5).map { index in
+            QuestionFeedback(
+                questionIndex: index,
+                score: 5,
+                feedback: "Standard response that meets basic requirements but needs more detail and specific examples."
+            )
+        }
+    }
     private func analyzeInterview() {
         print("\n=== STARTING INTERVIEW ANALYSIS ===")
         
@@ -196,20 +237,19 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             return
         }
         
-        // Validate responses
-        guard interview.responses.count == interview.questions.count else {
-            print("Error: Mismatch between questions (\(interview.questions.count)) and responses (\(interview.responses.count))")
-            return
+        // Debug print all questions and responses
+        print("\nDEBUG: All Questions and Responses:")
+        for (index, question) in interview.questions.enumerated() {
+            print("\nQuestion \(index + 1) [\(question.type.rawValue)]:")
+            print(question.text)
+            print("\nResponse:")
+            if index < interview.responses.count {
+                print(interview.responses[index])
+            } else {
+                print("NO RESPONSE")
+            }
+            print("-------------------")
         }
-        
-        // Validate all responses have content
-        guard !interview.responses.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
-            print("Error: Empty responses found")
-            return
-        }
-        
-        isLoading = true
-        print("Preparing analysis for \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level")
         
         let questionsAndResponses = interview.questions.enumerated().map { index, question in
             """
@@ -220,6 +260,17 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             \(interview.responses[index])
             """
         }.joined(separator: "\n\n")
+        
+        // Debug print the full prompt being sent
+        print("\nDEBUG: Full Analysis Prompt:")
+        print("----------------------------------------")
+        print("""
+        You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level.
+        
+        Interview Questions and Responses:
+        \(questionsAndResponses)
+        """)
+        print("----------------------------------------")
         
         let prompt = """
         You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level.
@@ -265,7 +316,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             do {
                 try await anthropicService.generateStreamingResponse(for: prompt)
                 print("Analysis request sent successfully")
-            } catch {
+            } catch let error {
                 await MainActor.run {
                     self.isLoading = false
                     print("Error during analysis: \(error.localizedDescription)")
@@ -282,22 +333,39 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         }
     }
     
+    func startNewInterview() {
+        reset()
+        // Add a slight delay to ensure clean state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.currentState = .setup
+        }
+    }
+    
     func confirmEndInterview() {
         currentState = .reviewing
         analyzeInterview()
         showingEndInterviewAlert = false
     }
-    
+
     func reset() {
-        jobTitle = ""
-        experienceLevel = .entry
-        interview = nil
-        currentResponse = ""
-        currentState = .setup
-        isLoading = false
-        showingAnalysis = false
-        currentGeneratedContent = ""
-        showingEndInterviewAlert = false
+        isResetting = true
+        DispatchQueue.main.async {
+            // Reset all state variables
+            self.jobTitle = ""
+            self.experienceLevel = .entry
+            self.interview = nil
+            self.currentResponse = ""
+            self.currentState = .setup
+            self.isLoading = false
+            self.showingAnalysis = false
+            self.currentGeneratedContent = ""
+            self.showingEndInterviewAlert = false
+            
+            // Add a delay before allowing new interview to start
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.isResetting = false
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -410,7 +478,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         let sections = response.components(separatedBy: "\n\n")
         print("Found \(sections.count) sections")
         
-        // Parse overall score (keeping existing flexible parsing)
+        // Parse overall score
         var overallScore = 0
         if let scoreLine = sections.first(where: { $0.contains("OVERALL_SCORE:") }) {
             let scoreComponents = scoreLine.components(separatedBy: ":")
@@ -420,7 +488,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             }
         }
         
-        // Parse strengths (keeping existing flexible parsing)
+        // Parse strengths
         var strengths: [String] = []
         if let strengthsSection = sections.first(where: { $0.contains("STRENGTHS:") }) {
             strengths = strengthsSection
@@ -429,7 +497,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
                 .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "- ")) }
         }
         
-        // Parse improvements (keeping existing flexible parsing)
+        // Parse improvements
         var improvements: [String] = []
         if let improvementsSection = sections.first(where: { $0.contains("IMPROVEMENTS:") }) {
             improvements = improvementsSection
@@ -438,35 +506,22 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
                 .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "- ")) }
         }
         
-        // Parse detailed feedback with new strict parsing
+        // Parse detailed feedback
         var detailedFeedback: [QuestionFeedback] = []
         if let feedbackSection = sections.first(where: { $0.contains("DETAILED_FEEDBACK:") }) {
-            print("\nProcessing DETAILED_FEEDBACK section:")
-            print(feedbackSection)
-            
-            // Split into lines and process only the Q lines
             let feedbackLines = feedbackSection
                 .components(separatedBy: .newlines)
                 .filter { $0.starts(with: "Q") }
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-            
-            print("\nFound \(feedbackLines.count) feedback lines:")
-            feedbackLines.forEach { print($0) }
             
             for line in feedbackLines {
-                // Match the exact format: Q1:[Score]|[Feedback]
                 let components = line.components(separatedBy: "|")
                 guard components.count == 2 else { continue }
                 
                 let scoreComponent = components[0].trimmingCharacters(in: .whitespaces)
                 let feedback = components[1].trimmingCharacters(in: .whitespaces)
                 
-                // Extract question number and score from Q1:[Score]
                 if let questionNumber = Int(scoreComponent.dropFirst().prefix(1)),
                    let score = Int(scoreComponent.components(separatedBy: ":")[1].trimmingCharacters(in: .whitespaces)) {
-                    
-                    print("Processing Q\(questionNumber) - Score: \(score)")
-                    
                     detailedFeedback.append(QuestionFeedback(
                         questionIndex: questionNumber - 1,
                         score: score,
@@ -474,36 +529,9 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
                     ))
                 }
             }
-            
-            // Sort by question index
-            detailedFeedback.sort { $0.questionIndex < $1.questionIndex }
-            
-            print("\nProcessed Feedback Summary:")
-            detailedFeedback.forEach { feedback in
-                print("Q\(feedback.questionIndex + 1): Score \(feedback.score)")
-            }
         }
         
-        // Ensure we have all 6 feedback items
-        if detailedFeedback.count != 6 {
-            print("Warning: Expected 6 feedback items, found \(detailedFeedback.count)")
-            
-            // Add missing feedback items
-            for i in 0..<6 {
-                if !detailedFeedback.contains(where: { $0.questionIndex == i }) {
-                    detailedFeedback.append(QuestionFeedback(
-                        questionIndex: i,
-                        score: 0,
-                        feedback: "No feedback provided for Question \(i + 1)"
-                    ))
-                }
-            }
-            
-            // Sort again after adding missing items
-            detailedFeedback.sort { $0.questionIndex < $1.questionIndex }
-        }
-        
-        // Create and assign analysis
+        // Create analysis object
         let analysis = InterviewAnalysis(
             overallScore: overallScore,
             strengths: strengths,
@@ -511,16 +539,15 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
             detailedFeedback: detailedFeedback
         )
         
-        print("\nFinal Analysis Summary:")
-        print("Overall Score: \(analysis.overallScore)")
-        print("Strengths: \(analysis.strengths.count)")
-        print("Improvements: \(analysis.improvements.count)")
-        print("Detailed Feedback: \(analysis.detailedFeedback.count)")
-        
+        // Directly assign the analysis to the interview
         interview.analysis = analysis
-        self.interview = interview
-        self.showingAnalysis = true
-        self.isLoading = false
+        
+        // Update the published interview property
+        DispatchQueue.main.async {
+            self.interview = interview
+            self.showingAnalysis = true
+            self.isLoading = false
+        }
     }
 
     // Helper functions

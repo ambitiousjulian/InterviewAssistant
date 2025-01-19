@@ -8,52 +8,64 @@ struct LiveHelperView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background
-                AppTheme.gradient
-                    .opacity(0.1)
-                    .ignoresSafeArea()
+                // Enhanced Background with gradient overlay
+                LinearGradient(
+                    colors: [
+                        AppTheme.primary.opacity(0.1),
+                        AppTheme.secondary.opacity(0.1),
+                        AppTheme.accent.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
                 // Main Content
-                VStack(spacing: 25) {
-                    // Mode Selection Card
-                    inputMethodsCard
-                        .offset(y: isAnimating ? 0 : -30)
-                    
-                    // Question Display
-                    questionCard
-                        .offset(y: isAnimating ? 0 : 30)
-                    
-                    Spacer()
-                    
-                    // Control Buttons
-                    controlButtons
-                        .offset(y: isAnimating ? 0 : 50)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        inputMethodsCard
+                            .offset(y: isAnimating ? 0 : -30)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isAnimating)
+                        
+                        questionCard
+                            .offset(y: isAnimating ? 0 : 30)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1), value: isAnimating)
+                        
+                        Spacer(minLength: 43)
+                        
+                        controlButtons
+                            .offset(y: isAnimating ? 0 : 50)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: isAnimating)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
                 }
-                .padding(.horizontal)
-                .padding(.top)
                 
-                // Overlays
+                // Enhanced Overlays
                 if viewModel.isProcessing {
                     ProcessingOverlay()
+                        .transition(.opacity)
                 }
                 
                 if viewModel.showingAnswer {
-                    Color.black.opacity(0.3)
+                    Color.black.opacity(0.4)
                         .ignoresSafeArea()
+                        .transition(.opacity)
                     
                     AnswerSheet(viewModel: viewModel) {
-                        viewModel.dismissAnswer()
+                        withAnimation(.spring()) {
+                            viewModel.dismissAnswer()
+                        }
                     }
+                    .transition(.move(edge: .bottom))
                 }
             }
-            .navigationTitle("Fuck Interviews AI")
+            .navigationTitle("Interview AI")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: showHelp) {
-                        Image(systemName: "questionmark.circle")
-                            .foregroundColor(AppTheme.primary)
-                    }
+                    helpButton
+                        .tint(AppTheme.purple)
                 }
             }
             .sheet(isPresented: $viewModel.showingCamera) {
@@ -62,7 +74,7 @@ struct LiveHelperView: View {
                 }
             }
             .alert("Error", isPresented: $viewModel.showError) {
-                Button("OK") {
+                Button("OK", role: .cancel) {
                     viewModel.showError = false
                 }
             } message: {
@@ -74,118 +86,143 @@ struct LiveHelperView: View {
                 isAnimating = true
             }
         }
-        .onDisappear {
-            viewModel.reset()  // Clean up when view disappears
-        }
     }
     
     private var inputMethodsCard: some View {
-        VStack(spacing: 15) {
-            Text("Choose Input Method")
-                .font(.headline)
+        VStack(spacing: 16) {
+            Text("Select Input Method")
+                .font(.system(size: 20, weight: .bold))
                 .foregroundColor(AppTheme.text)
             
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
                 InputMethodButton(
                     icon: "waveform.circle.fill",
-                    title: "Voice",
-                    subtitle: "Record question",
-                    isActive: viewModel.isRecording
+                    title: "Voice Input",
+                    subtitle: "Speak your question",
+                    isActive: viewModel.isRecording,
+                    gradientColors: [AppTheme.primary, AppTheme.secondary]
                 ) {
-                    if viewModel.isRecording {
-                        viewModel.stopRecording()
-                    } else {
-                        viewModel.startRecording()
+                    withAnimation {
+                        viewModel.isRecording ? viewModel.stopRecording() : viewModel.startRecording()
                     }
                 }
                 
                 InputMethodButton(
                     icon: "camera.circle.fill",
-                    title: "Photo",
-                    subtitle: "Capture text",
-                    isActive: false
+                    title: "Camera Input",
+                    subtitle: "Scan your question",
+                    isActive: false,
+                    gradientColors: [AppTheme.purple, AppTheme.secondary]
                 ) {
                     viewModel.showingCamera = true
                 }
             }
         }
-        .padding()
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 24)
                 .fill(Color.white)
-                .shadow(color: AppTheme.shadowLight, radius: 10)
+                .shadow(color: AppTheme.shadowLight, radius: 15, x: 0, y: 5)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(AppTheme.primary.opacity(0.1), lineWidth: 1)
+                )
         )
     }
+    
     private var questionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Question")
-                    .font(.headline)
-                    .foregroundColor(AppTheme.text)
+                Label("Your Question", systemImage: "text.bubble.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(AppTheme.purple)
                 
                 Spacer()
                 
                 if !viewModel.capturedText.isEmpty {
-                    Button("Clear") {
-                        viewModel.clearState()
+                    Button(action: { viewModel.clearState() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Clear")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(AppTheme.secondary.opacity(0.1))
+                        )
                     }
-                    .font(.subheadline)
-                    .foregroundColor(AppTheme.secondary)
                 }
             }
             
             Text(viewModel.capturedText.isEmpty ? "Your question will appear here..." : viewModel.capturedText)
                 .font(.body)
-                .foregroundColor(viewModel.capturedText.isEmpty ? .gray : AppTheme.text)
+                .foregroundColor(viewModel.capturedText.isEmpty ? AppTheme.text.opacity(0.5) : AppTheme.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: 100)
+                .frame(minHeight: 120)
                 .padding()
                 .background(
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(AppTheme.surface)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(AppTheme.primary.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppTheme.surface.opacity(0.7))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppTheme.accent.opacity(0.2), lineWidth: 1)
+                        )
                 )
         }
-        .padding()
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 24)
                 .fill(Color.white)
-                .shadow(color: AppTheme.shadowLight, radius: 10)
+                .shadow(color: AppTheme.shadowLight, radius: 15, x: 0, y: 5)
         )
     }
     
     private var controlButtons: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             if viewModel.isRecording {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Circle()
-                        .fill(Color.red)
+                        .fill(AppTheme.primary)
                         .frame(width: 8, height: 8)
                         .opacity(isAnimating ? 1 : 0.3)
                         .animation(.easeInOut(duration: 0.5).repeatForever(), value: isAnimating)
                     
-                    Text("Recording...")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
+                    Text("Recording in progress...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.primary)
                 }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .background(
+                    Capsule()
+                        .fill(AppTheme.primary.opacity(0.1))
+                )
             }
             
             ModernCircleButton(
                 icon: viewModel.isRecording ? "stop.fill" : "mic.fill",
-                color: viewModel.isRecording ? .red : AppTheme.primary,
-                size: 70
+                gradientColors: viewModel.isRecording ?
+                    [AppTheme.primary, AppTheme.primary.opacity(0.8)] :
+                    [AppTheme.purple, AppTheme.secondary],
+                size: 75
             ) {
-                if viewModel.isRecording {
-                    viewModel.stopRecording()
-                } else {
-                    viewModel.startRecording()
+                withAnimation {
+                    viewModel.isRecording ? viewModel.stopRecording() : viewModel.startRecording()
                 }
             }
         }
         .padding(.bottom, 30)
+    }
+    
+    private var helpButton: some View {
+        Button(action: showHelp) {
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(AppTheme.purple)
+        }
     }
     
     private func showHelp() {
@@ -208,52 +245,67 @@ struct LiveHelperView: View {
     }
 }
 
+// Updated InputMethodButton
 struct InputMethodButton: View {
     let icon: String
     let title: String
     let subtitle: String
     let isActive: Bool
+    let gradientColors: [Color]
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(isActive ? AppTheme.primary.opacity(0.1) : AppTheme.surface)
-                        .frame(width: 60, height: 60)
+                        .fill(
+                            LinearGradient(
+                                colors: isActive ? gradientColors : [Color.white],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 65, height: 65)
+                        .shadow(
+                            color: isActive ? gradientColors[0].opacity(0.3) : AppTheme.shadowLight,
+                            radius: isActive ? 15 : 10
+                        )
                     
                     Image(systemName: icon)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(isActive ? AppTheme.primary : AppTheme.text)
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundColor(isActive ? .white : gradientColors[0])
                 }
                 
-                VStack(spacing: 2) {
+                VStack(spacing: 4) {
                     Text(title)
-                        .font(.callout)
-                        .fontWeight(.medium)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(AppTheme.text)
                     
                     Text(subtitle)
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+                        .font(.caption)
+                        .foregroundColor(AppTheme.text.opacity(0.6))
                 }
             }
-            .frame(width: 120)
-            .padding(.vertical, 12)
+            .frame(width: 140)
+            .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 15)
+                RoundedRectangle(cornerRadius: 20)
                     .fill(Color.white)
-                    .shadow(color: isActive ? AppTheme.primary.opacity(0.2) : AppTheme.shadowLight,
-                           radius: isActive ? 8 : 5)
+                    .shadow(
+                        color: isActive ? gradientColors[0].opacity(0.2) : AppTheme.shadowLight,
+                        radius: isActive ? 15 : 10
+                    )
             )
         }
         .buttonStyle(ScaleButtonStyle())
     }
 }
 
+// Updated ModernCircleButton
 struct ModernCircleButton: View {
     let icon: String
-    let color: Color
+    let gradientColors: [Color]
     let size: CGFloat
     let action: () -> Void
     
@@ -261,10 +313,20 @@ struct ModernCircleButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(color)
+                    .fill(
+                        LinearGradient(
+                            colors: gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: size, height: size)
-                    .shadow(color: color.opacity(0.3),
-                           radius: 10, x: 0, y: 5)
+                    .shadow(color: gradientColors[0].opacity(0.4),
+                           radius: 15, x: 0, y: 8)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                    )
                 
                 Image(systemName: icon)
                     .font(.system(size: size * 0.4, weight: .medium))
