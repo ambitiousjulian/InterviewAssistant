@@ -66,6 +66,7 @@ final class AnthropicService {
         - Use clear, concise, and impactful language relevant to the question.
         - Interpret ambiguous terms or incomplete questions in context, ensuring the most likely intended meaning is addressed.
         - Avoid unnecessary reasoning or apologies and directly provide the best possible answer.
+        - Answer using the candidate's context for a more personal answer, when applicable.
         """
         
         if let analysis = resumeAnalysis {
@@ -186,5 +187,10 @@ final class AnthropicService {
         }
         
         return correctedWords.joined(separator: " ")
+    }
+    
+    func updateResumeAnalysis(_ analysis: User.ResumeAnalysis?) {
+        self.resumeAnalysis = analysis
+        print("[DEBUG] AnthropicService updated with resume analysis: \(analysis?.skills ?? [])")
     }
 }

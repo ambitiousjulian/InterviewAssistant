@@ -43,7 +43,7 @@ class ResumeAnalyzer {
         Analyze this resume and provide only a JSON response in this exact format:
         {
             "skills": ["skill1", "skill2", ...],
-            "summary": "A concise summary of the candidate's experience, education, and qualifications."
+            "summary": "A concise summary of the candidate's experience, education, and qualifications. Ensure to make it include the users actual experience, information and all-around details."
         }
         
         Resume text:

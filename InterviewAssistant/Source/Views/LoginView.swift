@@ -145,19 +145,6 @@ struct LoginView: View {
         #endif
     }
     
-    private func handleAuthentication() {
-        isLoading = true
-        if isRegistering {
-            Auth.auth().createUser(withEmail: email, password: password) { result, error in
-                handleAuthResult(result, error)
-            }
-        } else {
-            Auth.auth().signIn(withEmail: email, password: password) { result, error in
-                handleAuthResult(result, error)
-            }
-        }
-    }
-    
     private func handleAuthResult(_ result: AuthDataResult?, _ error: Error?) {
         isLoading = false
         if let error = error {
@@ -166,20 +153,37 @@ struct LoginView: View {
         }
     }
     
-    private func createDevAccountIfNeeded() {
-        Auth.auth().createUser(withEmail: email, password: password) { result, error in
-            if error != nil {
-                // Account might exist, try signing in
-                Auth.auth().signIn(withEmail: email, password: password) { result, error in
-                    isLoading = false
-                    if let error = error {
-                        alertMessage = error.localizedDescription
-                        showAlert = true
-                    }
+    private func handleAuthentication() {
+        Task {
+            do {
+                isLoading = true
+                if isRegistering {
+                    try await viewModel.signUp(email: email, password: password)
+                } else {
+                    try await viewModel.signIn(email: email, password: password)
                 }
-            } else {
-                isLoading = false
+            } catch {
+                alertMessage = error.localizedDescription
+                showAlert = true
             }
+            isLoading = false
+        }
+    }
+
+    private func createDevAccountIfNeeded() {
+        Task {
+            do {
+                try await viewModel.signUp(email: email, password: password)
+            } catch {
+                // Account might exist, try signing in
+                do {
+                    try await viewModel.signIn(email: email, password: password)
+                } catch {
+                    alertMessage = error.localizedDescription
+                    showAlert = true
+                }
+            }
+            isLoading = false
         }
     }
 }

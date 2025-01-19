@@ -73,10 +73,8 @@ class ProfileViewModel: ObservableObject {
         isLoading = true
         Task {
             do {
-                // Analyze resume using ResumeAnalyzer
                 let analysis = try await ResumeAnalyzer.shared.analyzeResume(resumeText)
                 
-                // Update the user model with the new analysis
                 if var updatedUser = user {
                     updatedUser.resumeAnalysis = analysis
                     try await FirebaseManager.shared.updateUserProfile(updatedUser)
@@ -84,6 +82,11 @@ class ProfileViewModel: ObservableObject {
                     await MainActor.run {
                         self.user = updatedUser
                         self.originalUser = updatedUser
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ResumeAnalysisUpdated"),
+                            object: nil,
+                            userInfo: ["analysis": analysis]
+                        )
                         self.isLoading = false
                         self.showingResumeInput = false
                     }

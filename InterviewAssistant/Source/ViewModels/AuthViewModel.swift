@@ -5,6 +5,8 @@ import FirebaseAuth
 class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var isAuthenticated = false
+    @Published var isLoading = false
+    @Published var error: String?
     
     private var handler: AuthStateDidChangeListenerHandle?
     
@@ -14,10 +16,16 @@ class AuthViewModel: ObservableObject {
     
     private func setupAuthStateListener() {
         handler = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if let firebaseUser = firebaseUser {
-                    self?.currentUser = FirebaseManager.shared.convertFirebaseUser(firebaseUser)
-                    self?.isAuthenticated = true
+                    do {
+                        let user = try await FirebaseManager.shared.fetchUserProfile(uid: firebaseUser.uid)
+                        self?.currentUser = user
+                        self?.isAuthenticated = true
+                    } catch {
+                        print("[ERROR] Failed to fetch user profile: \(error)")
+                        self?.error = error.localizedDescription
+                    }
                 } else {
                     self?.currentUser = nil
                     self?.isAuthenticated = false
@@ -26,17 +34,33 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    func signIn(email: String, password: String) {
-        Task {
-            do {
-                let user = try await FirebaseManager.shared.signIn(email: email, password: password)
-                DispatchQueue.main.async {
-                    self.currentUser = user
-                    self.isAuthenticated = true
-                }
-            } catch {
-                print("Sign in error: \(error.localizedDescription)")
-            }
+    @MainActor
+    func signIn(email: String, password: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let user = try await FirebaseManager.shared.signIn(email: email, password: password)
+            self.currentUser = user
+            self.isAuthenticated = true
+        } catch {
+            self.error = error.localizedDescription
+            throw error
+        }
+    }
+    
+    @MainActor
+    func signUp(email: String, password: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let user = try await FirebaseManager.shared.signUp(email: email, password: password, name: email.components(separatedBy: "@").first ?? "")
+            self.currentUser = user
+            self.isAuthenticated = true
+        } catch {
+            self.error = error.localizedDescription
+            throw error
         }
     }
     
@@ -44,7 +68,8 @@ class AuthViewModel: ObservableObject {
         do {
             try FirebaseManager.shared.signOut()
         } catch {
-            print("Sign out error: \(error.localizedDescription)")
+            print("[ERROR] Sign out error: \(error.localizedDescription)")
+            self.error = error.localizedDescription
         }
     }
 }
