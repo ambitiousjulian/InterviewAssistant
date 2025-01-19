@@ -28,7 +28,10 @@ struct ProfileView: View {
                             VStack(spacing: 15) {
                                 ProfileTextField(
                                     title: "Name",
-                                    text: $viewModel.name,
+                                    text: Binding(
+                                        get: { viewModel.user?.name ?? "" },
+                                        set: { viewModel.updateUserField(\.name, value: $0) }
+                                    ),
                                     icon: "person.text.rectangle"
                                 )
                                 
@@ -41,22 +44,42 @@ struct ProfileView: View {
                             }
                         }
                         
-                        // Job Preferences
-                        ProfileCard(title: "Job Preferences", icon: "briefcase.fill") {
+                        // Resume Section
+                        ProfileCard(title: "Resume & Experience", icon: "doc.text.fill") {
                             VStack(spacing: 15) {
+                                if let resumeAnalysis = viewModel.user?.resumeAnalysis {
+                                    resumeAnalysisView(resumeAnalysis)
+                                } else {
+                                    resumeUploadPrompt
+                                }
+                                
+                                Divider()
+                                    .padding(.vertical, 5)
+                                
                                 ProfileTextField(
                                     title: "Target Role",
-                                    text: $viewModel.targetRole,
+                                    text: Binding(
+                                        get: { viewModel.user?.profile?.jobPreferences.targetRole ?? "" },
+                                        set: { viewModel.updateProfileField(\User.Profile.jobPreferences.targetRole, value: $0) }
+                                    ),
                                     icon: "target"
                                 )
                                 
                                 ProfileTextField(
                                     title: "Target Industry",
-                                    text: $viewModel.targetIndustry,
+                                    text: Binding(
+                                        get: { viewModel.user?.profile?.jobPreferences.targetIndustry ?? "" },
+                                        set: { viewModel.updateProfileField(\User.Profile.jobPreferences.targetIndustry, value: $0) }
+                                    ),
                                     icon: "building.2"
                                 )
                                 
-                                ExperiencePicker(selection: $viewModel.experienceLevel)
+                                ExperiencePicker(
+                                    selection: Binding(
+                                        get: { viewModel.user?.profile?.jobPreferences.experienceLevel ?? .entry },
+                                        set: { viewModel.updateProfileField(\User.Profile.jobPreferences.experienceLevel, value: $0) }
+                                    )
+                                )
                             }
                         }
                         
@@ -64,36 +87,40 @@ struct ProfileView: View {
                         ProfileCard(title: "Current Experience", icon: "clock.fill") {
                             VStack(spacing: 15) {
                                 ExperienceStepper(
-                                    value: $viewModel.yearsOfExperience,
+                                    value: Binding(
+                                        get: { viewModel.user?.profile?.experience.yearsOfExperience ?? 0 },
+                                        set: { viewModel.updateProfileField(\User.Profile.experience.yearsOfExperience, value: $0) }
+                                    ),
                                     range: 0...50
                                 )
                                 
                                 ProfileTextField(
                                     title: "Current Role",
-                                    text: $viewModel.currentRole,
+                                    text: Binding(
+                                        get: { viewModel.user?.profile?.experience.currentRole ?? "" },
+                                        set: { viewModel.updateProfileField(\User.Profile.experience.currentRole, value: $0) }
+                                    ),
                                     icon: "person.text.rectangle"
                                 )
                                 
                                 ProfileTextField(
                                     title: "Current Industry",
-                                    text: $viewModel.currentIndustry,
+                                    text: Binding(
+                                        get: { viewModel.user?.profile?.experience.currentIndustry ?? "" },
+                                        set: { viewModel.updateProfileField(\User.Profile.experience.currentIndustry, value: $0) }
+                                    ),
                                     icon: "building"
                                 )
                             }
                         }
                         
-                        // Action Buttons
                         actionButtons
                     }
                     .padding(.horizontal)
                     .offset(y: isAnimating ? 0 : 30)
                 }
             }
-            .background(
-                backgroundGradient
-                    .opacity(0.1)
-                    .ignoresSafeArea()
-            )
+            .background(backgroundGradient.opacity(0.1).ignoresSafeArea())
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Sign Out", isPresented: $showingSignOutAlert) {
@@ -104,6 +131,19 @@ struct ProfileView: View {
             }
             .alert("Profile Updated", isPresented: $viewModel.showingSaveAlert) {
                 Button("OK") { }
+            }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: {
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                }
+            }
+            .sheet(isPresented: $viewModel.showingResumeInput) {
+                ResumeInputView(viewModel: viewModel)
             }
             .overlay {
                 if viewModel.isLoading {
@@ -118,6 +158,8 @@ struct ProfileView: View {
         }
     }
     
+    // MARK: - Component Views
+    
     private var profileHeader: some View {
         VStack(spacing: 15) {
             ZStack {
@@ -131,9 +173,10 @@ struct ProfileView: View {
             }
             
             VStack(spacing: 5) {
-                Text(viewModel.name.isEmpty ? "Add Your Name" : viewModel.name)
+                Text(viewModel.user?.name ?? "Add Your Name")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(AppTheme.text)
                 
                 Text(Auth.auth().currentUser?.email ?? "")
                     .font(.subheadline)
@@ -141,6 +184,73 @@ struct ProfileView: View {
             }
         }
         .padding(.vertical, 20)
+    }
+    
+    private var resumeUploadPrompt: some View {
+        Button {
+            viewModel.showingResumeInput = true
+        } label: {
+            VStack(spacing: 12) {
+                Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 30))
+                    .foregroundColor(AppTheme.primary)
+                
+                Text("Upload Resume")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.primary)
+                
+                Text("We'll analyze your resume to enhance your interview preparation")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(AppTheme.primary.opacity(0.1))
+            .cornerRadius(12)
+        }
+    }
+    private func resumeAnalysisView(_ analysis: User.ResumeAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Resume Uploaded")
+                        .font(.headline)
+                        .foregroundColor(.green)
+                    
+                    Text("Last updated: \(analysis.lastUpdated.formatted(.dateTime.day().month()))")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Button {
+                    viewModel.showingResumeInput = true
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundColor(AppTheme.primary)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Key Skills")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                FlowLayout(spacing: 8) {
+                    ForEach(analysis.skills, id: \.self) { skill in
+                        Text(skill)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(AppTheme.primary.opacity(0.1))
+                            .foregroundColor(AppTheme.primary)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+        }
     }
     
     private var actionButtons: some View {
@@ -202,14 +312,15 @@ struct ProfileCard<Content: View>: View {
                     .foregroundColor(AppTheme.primary)
                 Text(title)
                     .font(.headline)
+                    .foregroundColor(AppTheme.text)
             }
             
             content()
         }
         .padding()
-        .background(Color.white)
+        .background(AppTheme.surface)
         .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .shadow(color: AppTheme.shadowLight, radius: 10, x: 0, y: 5)
     }
 }
 
@@ -234,12 +345,16 @@ struct ProfileTextField: View {
             .padding()
             .background(AppTheme.surface)
             .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+            )
         }
     }
 }
 
 struct ExperiencePicker: View {
-    @Binding var selection: UserProfile.JobPreferences.ExperienceLevel
+    @Binding var selection: User.JobPreferences.ExperienceLevel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -248,7 +363,7 @@ struct ExperiencePicker: View {
                 .foregroundColor(.gray)
             
             Picker("", selection: $selection) {
-                ForEach(UserProfile.JobPreferences.ExperienceLevel.allCases, id: \.self) { level in
+                ForEach(User.JobPreferences.ExperienceLevel.allCases, id: \.self) { level in
                     Text(level.rawValue).tag(level)
                 }
             }
@@ -296,6 +411,76 @@ struct ExperienceStepper: View {
             .padding(.vertical, 8)
             .background(AppTheme.surface)
             .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(
+            in: proposal.width ?? 0,
+            spacing: spacing,
+            subviews: subviews
+        )
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(
+            in: bounds.width,
+            spacing: spacing,
+            subviews: subviews
+        )
+        
+        for (index, subview) in subviews.enumerated() {
+            subview.place(
+                at: CGPoint(
+                    x: bounds.minX + result.positions[index].x,
+                    y: bounds.minY + result.positions[index].y
+                ),
+                proposal: ProposedViewSize(result.sizes[index])
+            )
+        }
+    }
+    
+    struct FlowResult {
+        var sizes: [CGSize]
+        var positions: [CGPoint]
+        var size: CGSize
+        
+        init(in maxWidth: CGFloat, spacing: CGFloat, subviews: Subviews) {
+            var sizes = [CGSize]()
+            var positions = [CGPoint]()
+            var currentX: CGFloat = 0
+            var currentY: CGFloat = 0
+            var lineHeight: CGFloat = 0
+            var maxWidth: CGFloat = maxWidth
+            
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if currentX + size.width > maxWidth {
+                    currentX = 0
+                    currentY += lineHeight + spacing
+                    lineHeight = 0
+                }
+                
+                positions.append(CGPoint(x: currentX, y: currentY))
+                sizes.append(size)
+                
+                lineHeight = max(lineHeight, size.height)
+                currentX += size.width + spacing
+                maxWidth = max(maxWidth, currentX)
+            }
+            
+            self.sizes = sizes
+            self.positions = positions
+            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
         }
     }
 }

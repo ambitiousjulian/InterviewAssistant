@@ -5,31 +5,23 @@
 //  Created by Julian Cajuste on 1/12/25.
 //
 
-//
-//  User.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-
-//
-//  UserProfile.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
 
 // Source/Models/UserProfile.swift
 import Foundation
 
-struct UserProfile: Codable, Equatable {
-    var id: String
-    var name: String
+// Source/Models/User.swift
+struct User: Codable, Identifiable, Equatable {
+    let id: String
     var email: String
-    var jobPreferences: JobPreferences
-    var experience: Experience
+    var name: String
+    var profileImageURL: String?
+    var profile: Profile?
+    var resumeAnalysis: ResumeAnalysis?
+    
+    struct Profile: Codable, Equatable {
+        var jobPreferences: JobPreferences
+        var experience: Experience
+    }
     
     struct JobPreferences: Codable, Equatable {
         var targetRole: String
@@ -50,12 +42,26 @@ struct UserProfile: Codable, Equatable {
         var currentIndustry: String
     }
     
-    // Custom Equatable implementation if needed
-    static func == (lhs: UserProfile, rhs: UserProfile) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.name == rhs.name &&
-               lhs.email == rhs.email &&
-               lhs.jobPreferences == rhs.jobPreferences &&
-               lhs.experience == rhs.experience
+    struct ResumeAnalysis: Codable, Equatable {
+        var rawText: String
+        var skills: [String]
+        var education: [Education]
+        var workExperience: [WorkExperience]
+        var lastUpdated: Date
+        
+        struct Education: Codable, Equatable {
+            var institution: String
+            var degree: String
+            var fieldOfStudy: String
+            var graduationYear: Int?
+        }
+        
+        struct WorkExperience: Codable, Equatable {
+            var company: String
+            var role: String
+            var startDate: Date
+            var endDate: Date?
+            var responsibilities: [String]
+        }
     }
 }
