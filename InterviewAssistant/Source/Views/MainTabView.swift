@@ -20,11 +20,30 @@ struct MainTabView: View {
 //                }
             
             ProfileView()
-                            .tabItem {
-                                Label("Profile", systemImage: "person.circle.fill")
-                            }
+                .tabItem {
+                    Label("Profile", systemImage: "person.circle.fill")
+                }
         }
         .tint(AppTheme.primary)
+        .onAppear {
+            // Print resume analysis when the main tab view appears
+            Task {
+                if let userId = Auth.auth().currentUser?.uid {
+                    do {
+                        if let analysis = try await FirebaseManager.shared.getResumeAnalysis(userId: userId) {
+                            print("Resume Analysis Found:")
+                            print("Skills: \(analysis.skills.joined(separator: ", "))")
+                            print("Summary: \(analysis.summary)")
+                            print("Last Updated: \(analysis.lastUpdated)")
+                        } else {
+                            print("No resume analysis found")
+                        }
+                    } catch {
+                        print("Error fetching resume analysis: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
     }
 }
 
