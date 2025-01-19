@@ -26,39 +26,36 @@ struct MockInterviewView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                switch viewModel.currentState {
-                case .setup:
-                    setupView
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                case .inProgress:
-                    interviewView
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                case .reviewing:
-                    if !viewModel.isLoading {
+            if viewModel.isLoading {
+                    // Display processing overlay while loading
+                    MockInterviewLoadingOverlay(message: loadingMessage)
+                        .transition(.opacity)
+                        .zIndex(1) // Ensure overlay is always on top
+                } else {
+                    switch viewModel.currentState {
+                    case .setup:
+                        setupView
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .leading).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                    case .inProgress:
+                        interviewView
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .trailing).combined(with: .opacity)
+                            ))
+                    case .reviewing:
                         analysisView
                             .transition(.asymmetric(
                                 insertion: .move(edge: .trailing).combined(with: .opacity),
                                 removal: .move(edge: .trailing).combined(with: .opacity)
                             ))
+                    default:
+                        EmptyView()
                     }
-                default:
-                    EmptyView()
                 }
             }
-            
-            if viewModel.isLoading {
-                MockInterviewLoadingOverlay(message: loadingMessage)
-                    .transition(.opacity)
-                    .zIndex(1) // Ensure overlay is always on top
-            }
-        }
         .navigationTitle("Mock Interview")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -235,79 +232,85 @@ struct MockInterviewView: View {
     }
     
     private var analysisView: some View {
-        ScrollView {
-            VStack(spacing: 25) {
-                // Header
-                Text("Interview Analysis")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .padding(.top)
-                
-                Text("\(viewModel.jobTitle) - \(viewModel.experienceLevel.rawValue)")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                
-                // Score Card
-                ScoreCard(score: viewModel.interview?.analysis?.overallScore ?? 0)
-                    .padding(.horizontal)
-                
-                // Strengths
-                FeedbackSection(
-                    title: "Key Strengths",
-                    items: viewModel.interview?.analysis?.strengths ?? [],
-                    color: .green
-                )
-                .padding(.horizontal)
-                
-                // Improvements
-                FeedbackSection(
-                    title: "Areas for Growth",
-                    items: viewModel.interview?.analysis?.improvements ?? [],
-                    color: .orange
-                )
-                .padding(.horizontal)
-                
-                // Detailed Feedback
-                DetailedFeedbackSection(
-                    feedback: viewModel.interview?.analysis?.detailedFeedback ?? []
-                )
-                .padding(.horizontal)
-                
-                // Action Buttons
-                VStack(spacing: 15) {
-                    Button(action: {
-                        withAnimation {
-                            viewModel.startNewInterview()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("Start New Interview")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(AppTheme.primary)
-                        .foregroundColor(.white)
-                        .cornerRadius(15)
-                    }
-                    
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Text("Close")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
+        Group {
+            if let analysis = viewModel.interview?.analysis {
+                ScrollView {
+                    VStack(spacing: 25) {
+                        // Header
+                        Text("Interview Analysis")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .padding(.top)
+
+                        Text("\(viewModel.jobTitle) - \(viewModel.experienceLevel.rawValue)")
+                            .font(.subheadline)
                             .foregroundColor(.gray)
-                            .cornerRadius(15)
+
+                        // Score Card
+                        ScoreCard(score: analysis.overallScore)
+                            .padding(.horizontal)
+
+                        // Strengths
+                        FeedbackSection(
+                            title: "Key Strengths",
+                            items: analysis.strengths,
+                            color: .green
+                        )
+                        .padding(.horizontal)
+
+                        // Improvements
+                        FeedbackSection(
+                            title: "Areas for Growth",
+                            items: analysis.improvements,
+                            color: .orange
+                        )
+                        .padding(.horizontal)
+
+                        // Detailed Feedback
+                        DetailedFeedbackSection(feedback: analysis.detailedFeedback)
+                            .padding(.horizontal)
+
+                        // Action Buttons
+                        VStack(spacing: 15) {
+                            Button(action: {
+                                withAnimation {
+                                    viewModel.startNewInterview()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("Start New Interview")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(AppTheme.primary)
+                                .foregroundColor(.white)
+                                .cornerRadius(15)
+                            }
+
+//                            Button(action: {
+//                                dismiss()
+//                            }) {
+//                                Text("Close")
+//                                    .frame(maxWidth: .infinity)
+//                                    .padding()
+//                                    .background(Color.gray.opacity(0.1))
+//                                    .foregroundColor(.gray)
+//                                    .cornerRadius(15)
+//                            }
+                        }
+                        .padding()
                     }
+                    .padding(.bottom, 30)
                 }
-                .padding()
+                .background(Color.gray.opacity(0.05))
+            } else {
+                // While waiting for the analysis to complete, show the loading overlay
+                MockInterviewLoadingOverlay(message: loadingMessage)
             }
-            .padding(.bottom, 30)
         }
-        .background(Color.gray.opacity(0.05))
     }
+
 }
 
 // Supporting Views

@@ -273,7 +273,8 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         print("----------------------------------------")
         
         let prompt = """
-        You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level.
+        You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level. If a response is incoherent, irrelevant, or nonsensical, provide a lower score (1-3) and suggest improvements in clarity and relevance.
+
         
         Interview Questions and Responses:
         \(questionsAndResponses)
