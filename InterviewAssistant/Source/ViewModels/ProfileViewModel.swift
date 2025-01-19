@@ -1,4 +1,3 @@
-// Source/ViewModels/ProfileViewModel.swift
 import SwiftUI
 import FirebaseAuth
 
@@ -10,9 +9,9 @@ class ProfileViewModel: ObservableObject {
     @Published var resumeText = ""
     @Published var resumeAnalysisError: String?
     @Published var errorMessage: String?
-    @Published var isAnalyzing = false
-    private var originalUser: User?
     
+    private var originalUser: User?
+
     var hasChanges: Bool {
         return originalUser != user
     }
@@ -21,16 +20,22 @@ class ProfileViewModel: ObservableObject {
         loadProfile()
     }
     
+    // MARK: - Load Profile
     func loadProfile() {
         isLoading = true
-        
         Task {
             do {
-                let currentUser = try await FirebaseManager.shared.getCurrentUser()
-                await MainActor.run {
-                    self.user = currentUser
-                    self.originalUser = currentUser
-                    self.isLoading = false
+                if let currentUser = try await FirebaseManager.shared.getCurrentUser() {
+                    await MainActor.run {
+                        self.user = currentUser
+                        self.originalUser = currentUser
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.errorMessage = "No user found"
+                        self.isLoading = false
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -41,10 +46,10 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Save Profile
     func saveProfile() {
-        guard var updatedUser = user else { return }
+        guard let updatedUser = user else { return }
         isLoading = true
-        
         Task {
             do {
                 try await FirebaseManager.shared.updateUserProfile(updatedUser)
@@ -62,15 +67,16 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Analyze and Save Resume
     func analyzeAndSaveResume() {
         guard !resumeText.isEmpty else { return }
         isLoading = true
-        
         Task {
             do {
+                // Analyze resume using ResumeAnalyzer
                 let analysis = try await ResumeAnalyzer.shared.analyzeResume(resumeText)
                 
-                // Update user with new resume analysis
+                // Update the user model with the new analysis
                 if var updatedUser = user {
                     updatedUser.resumeAnalysis = analysis
                     try await FirebaseManager.shared.updateUserProfile(updatedUser)
@@ -91,6 +97,7 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Sign Out
     func signOut() {
         Task {
             do {
@@ -107,53 +114,11 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // Helper method to update specific user fields
+    // MARK: - Helper Methods
     func updateUserField(_ keyPath: WritableKeyPath<User, String>, value: String) {
         if var updatedUser = user {
             updatedUser[keyPath: keyPath] = value
             user = updatedUser
-        }
-    }
-    
-    // Helper method to update profile fields
-    func updateProfileField<T>(_ keyPath: WritableKeyPath<User.Profile, T>, value: T) {
-        if var updatedUser = user {
-            if updatedUser.profile == nil {
-                updatedUser.profile = User.Profile(
-                    jobPreferences: User.JobPreferences(
-                        targetRole: "",
-                        targetIndustry: "",
-                        experienceLevel: .entry
-                    ),
-                    experience: User.Experience(
-                        yearsOfExperience: 0,
-                        currentRole: "",
-                        currentIndustry: ""
-                    )
-                )
-            }
-            updatedUser.profile?[keyPath: keyPath] = value
-            user = updatedUser
-        }
-    }
-}
-
-// MARK: - Error Handling Extension
-extension ProfileViewModel {
-    enum ProfileError: LocalizedError {
-        case userNotFound
-        case updateFailed
-        case invalidData
-        
-        var errorDescription: String? {
-            switch self {
-            case .userNotFound:
-                return "User profile not found"
-            case .updateFailed:
-                return "Failed to update profile"
-            case .invalidData:
-                return "Invalid profile data"
-            }
         }
     }
 }

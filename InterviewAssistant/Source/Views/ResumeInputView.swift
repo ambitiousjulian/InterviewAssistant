@@ -1,12 +1,3 @@
-//
-//  ResumeInputView.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/19/25.
-//
-
-
-// Source/Views/ResumeInputView.swift
 import SwiftUI
 
 struct ResumeInputView: View {
@@ -15,62 +6,66 @@ struct ResumeInputView: View {
     @State private var selectedInputMethod = 0
     @State private var showingDocumentPicker = false
     @State private var isAnimating = false
+    @State private var loadingProgress = 0.0
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 25) {
-                    // Header Section
-                    headerSection
-                        .offset(y: isAnimating ? 0 : -30)
-                    
-                    // Input Method Selector
-                    Picker("Input Method", selection: $selectedInputMethod) {
-                        Text("Paste Text").tag(0)
-                        Text("Upload File").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    
-                    // Input Section
-                    inputSection
-                        .offset(y: isAnimating ? 0 : 30)
-                    
-                    // Analysis Status
-                    if viewModel.isAnalyzing {
-                        analysisProgressView
-                    }
-                    
-                    // Error Display
-                    if let error = viewModel.resumeAnalysisError {
-                        errorView(error)
-                    }
-                    
-                    // Action Buttons
-                    actionButtons
-                        .offset(y: isAnimating ? 0 : 30)
+            VStack(spacing: 0) {
+                // Error Banner
+                if let error = viewModel.resumeAnalysisError {
+                    errorBanner(error)
                 }
-                .padding()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Header Section
+                        headerSection
+                            .offset(y: isAnimating ? 0 : -30)
+                        
+                        // Input Method Selector
+                        inputMethodSelector
+                        
+                        // Analyze Button (Moved to top)
+                        analyzeButton
+                            .padding(.horizontal)
+                        
+                        // Input Section with Error Display
+                        if let error = viewModel.resumeAnalysisError {
+                            errorView(error)
+                                .padding(.horizontal)
+                        }
+                        
+                        // Clipboard Button
+                        if selectedInputMethod == 0 {
+                            pasteClipboardButton
+                        }
+                        
+                        // Main Input Section
+                        inputSection
+                            .offset(y: isAnimating ? 0 : 30)
+                    }
+                    .padding()
+                }
+                .background(Color(UIColor.systemGroupedBackground))
+                .onTapGesture {
+                    dismissKeyboard()
+                }
             }
-            .background(
-                LinearGradient(
-                    colors: [AppTheme.primary.opacity(0.1), AppTheme.secondary.opacity(0.05)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-            .navigationTitle("Resume Upload")
+            .navigationTitle("Resume Analysis")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(
-                leading: Button("Cancel") {
-                    dismiss()
-                },
-                trailing: Button("Done") {
-                    viewModel.analyzeAndSaveResume()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
-                .disabled(viewModel.resumeText.isEmpty)
-            )
+            }
+            .overlay {
+                if viewModel.isLoading {
+                    loadingOverlay
+                        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                }
+            }
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.8)) {
@@ -80,9 +75,9 @@ struct ResumeInputView: View {
     }
     
     private var headerSection: some View {
-        VStack(spacing: 15) {
-            Image(systemName: "doc.text.viewfinder")
-                .font(.system(size: 50))
+        VStack(spacing: 12) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 40))
                 .foregroundColor(AppTheme.primary)
                 .padding()
                 .background(
@@ -91,11 +86,11 @@ struct ResumeInputView: View {
                         .frame(width: 100, height: 100)
                 )
             
-            Text("Upload Your Resume")
+            Text("Resume Analysis")
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("We'll analyze your resume to provide better interview preparation")
+            Text("We'll analyze your resume to enhance your interview preparation")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -103,62 +98,109 @@ struct ResumeInputView: View {
         }
     }
     
+    private var inputMethodSelector: some View {
+        Picker("Input Method", selection: $selectedInputMethod) {
+            Text("Paste Text").tag(0)
+            Text("Upload File").tag(1)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+    }
+    
     private var inputSection: some View {
         Group {
             if selectedInputMethod == 0 {
-                // Text Input
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Paste your resume text")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    Text("Resume Text")
+                        .font(.headline)
+                        .foregroundColor(AppTheme.text)
                     
                     TextEditor(text: $viewModel.resumeText)
                         .frame(minHeight: 200)
                         .padding()
-                        .background(Color.white)
-                        .cornerRadius(15)
-                        .shadow(color: Color.black.opacity(0.05), radius: 10)
+                        .background(AppTheme.surface)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+                        )
                 }
             } else {
-                // File Upload
-                VStack {
-                    Button {
-                        showingDocumentPicker = true
-                    } label: {
-                        VStack(spacing: 15) {
-                            Image(systemName: "arrow.up.doc")
-                                .font(.system(size: 30))
-                            Text("Upload PDF or Word Document")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(15)
-                        .shadow(color: Color.black.opacity(0.05), radius: 10)
-                    }
-                    .foregroundColor(AppTheme.primary)
-                    
-                    Text("Supported formats: PDF, DOC, DOCX")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
+                fileUploadSection
             }
         }
         .padding(.vertical)
     }
     
-    private var analysisProgressView: some View {
-        VStack(spacing: 15) {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Analyzing your resume...")
-                .font(.subheadline)
+    private var fileUploadSection: some View {
+        VStack {
+            Button {
+                showingDocumentPicker = true
+            } label: {
+                VStack(spacing: 15) {
+                    Image(systemName: "arrow.up.doc")
+                        .font(.system(size: 30))
+                    Text("Upload PDF or Word Document")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(AppTheme.surface)
+                .cornerRadius(15)
+                .shadow(color: AppTheme.shadowLight, radius: 5)
+            }
+            .foregroundColor(AppTheme.primary)
+            
+            Text("Supported formats: PDF, DOC, DOCX")
+                .font(.caption)
                 .foregroundColor(.gray)
         }
-        .frame(maxWidth: .infinity)
+    }
+    
+    private var pasteClipboardButton: some View {
+        Button {
+            if let clipboardText = UIPasteboard.general.string {
+                viewModel.resumeText = clipboardText
+            }
+        } label: {
+            HStack {
+                Image(systemName: "doc.on.clipboard")
+                Text("Paste from Clipboard")
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(AppTheme.primary.opacity(0.1))
+            .cornerRadius(12)
+        }
+    }
+    
+    private var analyzeButton: some View {
+        Button {
+            dismissKeyboard()
+            viewModel.analyzeAndSaveResume()
+        } label: {
+            HStack {
+                Image(systemName: "wand.and.stars")
+                Text("Analyze Resume")
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(viewModel.resumeText.isEmpty ? AppTheme.primary.opacity(0.3) : AppTheme.primary)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+        }
+        .disabled(viewModel.resumeText.isEmpty)
+    }
+    
+    private func errorBanner(_ error: String) -> some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(error)
+                .font(.subheadline)
+        }
+        .foregroundColor(.white)
         .padding()
-        .background(Color.white)
-        .cornerRadius(15)
+        .frame(maxWidth: .infinity)
+        .background(Color.red)
     }
     
     private func errorView(_ error: String) -> some View {
@@ -170,38 +212,76 @@ struct ResumeInputView: View {
                 .foregroundColor(.red)
         }
         .padding()
+        .frame(maxWidth: .infinity)
         .background(Color.red.opacity(0.1))
         .cornerRadius(10)
     }
     
-    private var actionButtons: some View {
-        VStack(spacing: 15) {
-            Button {
-                viewModel.analyzeAndSaveResume()
-            } label: {
-                HStack {
-                    Image(systemName: "wand.and.stars")
-                    Text("Analyze Resume")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(viewModel.resumeText.isEmpty ? AppTheme.primary.opacity(0.3) : AppTheme.primary)
-                .foregroundColor(.white)
-                .cornerRadius(15)
-            }
-            .disabled(viewModel.resumeText.isEmpty)
+    private var loadingOverlay: some View {
+        ZStack {
+            // Dimmed background
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .blur(radius: 2)
             
-            Button {
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .foregroundColor(.gray)
-                    .cornerRadius(15)
+            // Loading card
+            VStack(spacing: 20) {
+                // Animated circle
+                ZStack {
+                    Circle()
+                        .stroke(AppTheme.primary.opacity(0.2), lineWidth: 8)
+                        .frame(width: 60, height: 60)
+                    
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(AppTheme.primary, lineWidth: 8)
+                        .frame(width: 60, height: 60)
+                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isAnimating)
+                        .onAppear {
+                            isAnimating = true
+                        }
+                }
+                
+                VStack(spacing: 8) {
+                    Text("Analyzing Resume")
+                        .font(.headline)
+                        .foregroundColor(AppTheme.text)
+                    
+                    Text("This may take a few moments...")
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.text.opacity(0.7))
+                }
+                
+                // Progress indicators
+                HStack(spacing: 8) {
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(AppTheme.primary)
+                            .frame(width: 8, height: 8)
+                            .opacity(isAnimating ? 1 : 0.3)
+                            .animation(
+                                .easeInOut(duration: 0.4)
+                                .repeatForever()
+                                .delay(0.3 * Double(index)),
+                                value: isAnimating
+                            )
+                    }
+                }
             }
+            .padding(.horizontal, 40)
+            .padding(.vertical, 30)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(AppTheme.surface)
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+            )
+            .transition(.scale.combined(with: .opacity))
         }
+    }
+    
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 

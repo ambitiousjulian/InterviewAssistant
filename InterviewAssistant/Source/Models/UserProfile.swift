@@ -1,67 +1,56 @@
-//
-//  UserProfile.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-
-// Source/Models/UserProfile.swift
 import Foundation
+import FirebaseCore
 
-// Source/Models/User.swift
 struct User: Codable, Identifiable, Equatable {
     let id: String
     var email: String
     var name: String
-    var profileImageURL: String?
-    var profile: Profile?
     var resumeAnalysis: ResumeAnalysis?
     
-    struct Profile: Codable, Equatable {
-        var jobPreferences: JobPreferences
-        var experience: Experience
-    }
-    
-    struct JobPreferences: Codable, Equatable {
-        var targetRole: String
-        var targetIndustry: String
-        var experienceLevel: ExperienceLevel
-        
-        enum ExperienceLevel: String, Codable, CaseIterable {
-            case entry = "Entry Level"
-            case midLevel = "Mid Level"
-            case senior = "Senior Level"
-            case executive = "Executive"
-        }
-    }
-    
-    struct Experience: Codable, Equatable {
-        var yearsOfExperience: Int
-        var currentRole: String
-        var currentIndustry: String
-    }
-    
     struct ResumeAnalysis: Codable, Equatable {
-        var rawText: String
         var skills: [String]
-        var education: [Education]
-        var workExperience: [WorkExperience]
+        var summary: String
         var lastUpdated: Date
         
-        struct Education: Codable, Equatable {
-            var institution: String
-            var degree: String
-            var fieldOfStudy: String
-            var graduationYear: Int?
+        enum CodingKeys: String, CodingKey {
+            case skills
+            case summary
+            case lastUpdated
         }
         
-        struct WorkExperience: Codable, Equatable {
-            var company: String
-            var role: String
-            var startDate: Date
-            var endDate: Date?
-            var responsibilities: [String]
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            skills = try container.decode([String].self, forKey: .skills)
+            summary = try container.decode(String.self, forKey: .summary)
+            
+            // Handle Timestamp conversion
+            if let timestamp = try? container.decode(Timestamp.self, forKey: .lastUpdated) {
+                lastUpdated = timestamp.dateValue()
+            } else {
+                lastUpdated = Date()
+            }
         }
+        
+        init(skills: [String], summary: String, lastUpdated: Date) {
+            self.skills = skills
+            self.summary = summary
+            self.lastUpdated = lastUpdated
+        }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case name
+        case resumeAnalysis
+    }
+}
+
+extension User.ResumeAnalysis {
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(skills, forKey: .skills)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(Timestamp(date: lastUpdated), forKey: .lastUpdated)
     }
 }

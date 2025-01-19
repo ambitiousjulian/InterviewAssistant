@@ -1,4 +1,3 @@
-// Source/Services/FirebaseManager.swift
 import Firebase
 import FirebaseAuth
 import FirebaseFirestore
@@ -29,7 +28,7 @@ enum FirebaseError: LocalizedError {
 
 class FirebaseManager {
     static let shared = FirebaseManager()
-    private let db = Firestore.firestore()
+    let db = Firestore.firestore()
     
     private init() {}
     
@@ -42,8 +41,7 @@ class FirebaseManager {
     func signIn(email: String, password: String) async throws -> User {
         do {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
-            let user = try await fetchUserProfile(uid: result.user.uid)
-            return user
+            return try await fetchUserProfile(uid: result.user.uid)
         } catch {
             throw FirebaseError.unknownError(error.localizedDescription)
         }
@@ -56,22 +54,8 @@ class FirebaseManager {
                 id: result.user.uid,
                 email: email,
                 name: name,
-                profileImageURL: nil,
-                profile: User.Profile(
-                    jobPreferences: User.JobPreferences(
-                        targetRole: "",
-                        targetIndustry: "",
-                        experienceLevel: .entry
-                    ),
-                    experience: User.Experience(
-                        yearsOfExperience: 0,
-                        currentRole: "",
-                        currentIndustry: ""
-                    )
-                ),
                 resumeAnalysis: nil
             )
-            
             try await updateUserProfile(user)
             return user
         } catch {
@@ -80,11 +64,7 @@ class FirebaseManager {
     }
     
     func signOut() throws {
-        do {
-            try Auth.auth().signOut()
-        } catch {
-            throw FirebaseError.unknownError(error.localizedDescription)
-        }
+        try Auth.auth().signOut()
     }
     
     // MARK: - User Profile Methods
@@ -93,14 +73,32 @@ class FirebaseManager {
         guard let firebaseUser = Auth.auth().currentUser else {
             return nil
         }
-        return try await fetchUserProfile(uid: firebaseUser.uid)
+        
+        do {
+            let document = try await db.collection("users").document(firebaseUser.uid).getDocument()
+            if document.exists {
+                let user = try document.data(as: User.self)
+                return user
+            } else {
+                // Create a new user if document doesn't exist
+                let newUser = User(
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email ?? "",
+                    name: "",
+                    resumeAnalysis: nil
+                )
+                try await updateUserProfile(newUser)
+                return newUser
+            }
+        } catch {
+            throw FirebaseError.unknownError(error.localizedDescription)
+        }
     }
     
     func updateUserProfile(_ user: User) async throws {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw FirebaseError.notSignedIn
         }
-        
         do {
             try await db.collection("users").document(uid).setData(from: user)
         } catch {
@@ -126,8 +124,13 @@ class FirebaseManager {
     
     func updateResumeAnalysis(userId: String, analysis: User.ResumeAnalysis) async throws {
         do {
-            try await db.collection("users").document(userId)
-                .updateData(["resumeAnalysis": analysis])
+            try await db.collection("users").document(userId).updateData([
+                "resumeAnalysis": [
+                    "skills": analysis.skills,
+                    "summary": analysis.summary,
+                    "lastUpdated": Timestamp(date: analysis.lastUpdated)
+                ]
+            ])
         } catch {
             throw FirebaseError.unknownError(error.localizedDescription)
         }
@@ -136,23 +139,17 @@ class FirebaseManager {
     func getResumeAnalysis(userId: String) async throws -> User.ResumeAnalysis? {
         do {
             let document = try await db.collection("users").document(userId).getDocument()
-            if let data = document.data(),
-               let analysisData = data["resumeAnalysis"] as? [String: Any] {
-                let jsonData = try JSONSerialization.data(withJSONObject: analysisData)
-                return try JSONDecoder().decode(User.ResumeAnalysis.self, from: jsonData)
+            if let data = document.data()?["resumeAnalysis"] as? [String: Any],
+               let skills = data["skills"] as? [String],
+               let summary = data["summary"] as? String,
+               let lastUpdatedTimestamp = data["lastUpdated"] as? Timestamp {
+                return User.ResumeAnalysis(
+                    skills: skills,
+                    summary: summary,
+                    lastUpdated: lastUpdatedTimestamp.dateValue()
+                )
             }
             return nil
-        } catch {
-            throw FirebaseError.unknownError(error.localizedDescription)
-        }
-    }
-    
-    // MARK: - Profile Image Methods
-    
-    func updateProfileImage(userId: String, imageURL: String) async throws {
-        do {
-            try await db.collection("users").document(userId)
-                .updateData(["profileImageURL": imageURL])
         } catch {
             throw FirebaseError.unknownError(error.localizedDescription)
         }
@@ -162,28 +159,11 @@ class FirebaseManager {
     
     func convertFirebaseUser(_ firebaseUser: FirebaseAuth.User?) -> User? {
         guard let firebaseUser = firebaseUser else { return nil }
-        
         return User(
             id: firebaseUser.uid,
             email: firebaseUser.email ?? "",
             name: firebaseUser.displayName ?? "",
-            profileImageURL: firebaseUser.photoURL?.absoluteString,
-            profile: nil,
             resumeAnalysis: nil
         )
-    }
-    
-    func updateProfile(name: String) async throws {
-        guard let currentUser = Auth.auth().currentUser else {
-            throw FirebaseError.notSignedIn
-        }
-        
-        do {
-            let changeRequest = currentUser.createProfileChangeRequest()
-            changeRequest.displayName = name
-            try await changeRequest.commitChanges()
-        } catch {
-            throw FirebaseError.unknownError(error.localizedDescription)
-        }
     }
 }
