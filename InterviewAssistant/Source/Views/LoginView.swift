@@ -11,6 +11,8 @@ struct LoginView: View {
     @State private var alertMessage = ""
     @State private var isLoading = false
     @State private var isAnimating = false
+    @State private var showEULA = false
+    @State private var hasAgreedToEULA = false
     
     var body: some View {
         ZStack {
@@ -58,6 +60,21 @@ struct LoginView: View {
             withAnimation(.easeOut(duration: 1.2)) {
                 isAnimating = true
             }
+        }
+        .sheet(isPresented: $showEULA) {
+            EULAView(hasAgreed: $hasAgreedToEULA) {
+                Task {
+                    do {
+                        isLoading = true
+                        try await viewModel.signUp(email: email, password: password)
+                    } catch {
+                        alertMessage = error.localizedDescription
+                        showAlert = true
+                    }
+                    isLoading = false
+                }
+            }
+            .interactiveDismissDisabled() // Prevents dismissal by swipe
         }
     }
     
@@ -154,6 +171,10 @@ struct LoginView: View {
     }
     
     private func handleAuthentication() {
+        if isRegistering && !hasAgreedToEULA {
+            showEULA = true
+            return
+        }
         Task {
             do {
                 isLoading = true
