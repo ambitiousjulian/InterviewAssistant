@@ -5,6 +5,8 @@ struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var isAnimating = false
     @Environment(\.colorScheme) var colorScheme
+    @State private var showDeleteAccount = false
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     var body: some View {
         NavigationView {
@@ -35,6 +37,10 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $viewModel.showingResumeInput) {
                 ResumeInputView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showDeleteAccount) {
+                DeleteAccountView()
+                    .environmentObject(authViewModel)
             }
             .alert("Success", isPresented: $viewModel.showingSaveAlert) {
                 Button("OK", role: .cancel) { }
@@ -274,41 +280,39 @@ struct ProfileView: View {
                 .foregroundColor(AppTheme.text)
                 .cornerRadius(15)
             }
+            
+            // Add Delete Account Button
+            Button(action: { showDeleteAccount = true }) {
+                HStack {
+                    Image(systemName: "trash.fill")
+                    Text("Delete Account")
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .cornerRadius(15)
+            }
+        }
+    }
+    
+    private var deleteAccountButton: some View {
+        Button(action: { showDeleteAccount = true }) {
+            HStack {
+                Image(systemName: "trash.fill")
+                Text("Delete Account")
+            }
+            .foregroundColor(.red)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(15)
+        }
+        .sheet(isPresented: $showDeleteAccount) {
+            DeleteAccountView()
         }
     }
 }
-//
-//struct CustomTextField: View {
-//    let title: String
-//    @Binding var text: String
-//    let icon: String
-//    var isDisabled: Bool = false
-//    
-//    var body: some View {
-//        VStack(alignment: .leading, spacing: 8) {
-//            Text(title)
-//                .font(.subheadline)
-//                .foregroundColor(AppTheme.text.opacity(0.7))
-//            
-//            HStack {
-//                Image(systemName: icon)
-//                    .foregroundColor(AppTheme.primary)
-//                    .frame(width: 20)
-//                
-//                TextField(title, text: $text)
-//                    .textFieldStyle(PlainTextFieldStyle())
-//                    .disabled(isDisabled)
-//            }
-//            .padding()
-//            .background(AppTheme.surface)
-//            .cornerRadius(10)
-//            .overlay(
-//                RoundedRectangle(cornerRadius: 10)
-//                    .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
-//            )
-//        }
-//    }
-//}
 
 struct ProfileCard<Content: View>: View {
     let title: String
