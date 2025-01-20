@@ -273,7 +273,7 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
         print("----------------------------------------")
         
         let prompt = """
-        You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level. If a response is incoherent, irrelevant, or nonsensical, provide a lower score (1-3) and suggest improvements in clarity and relevance.
+        You are an expert interviewer and career coach analyzing responses for a \(interview.jobTitle) position at \(interview.experienceLevel.rawValue) level. If a response is incoherent, irrelevant, or nonsensical, provide a lower score (1-3) and suggest improvements in clarity and relevance. Also, for resposes where the user clearly tried to answer be a little lenient and gracious. Use your judgement to tell who actually deserves a 7 or above.
 
         
         Interview Questions and Responses:
