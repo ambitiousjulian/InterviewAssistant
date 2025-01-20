@@ -3,7 +3,7 @@ import FirebaseAuth
 
 // Complete LoginView
 struct LoginView: View {
-    @StateObject private var viewModel = AuthViewModel()
+    @EnvironmentObject var viewModel: AuthViewModel
     @State private var email = ""
     @State private var password = ""
     @State private var isRegistering = false
@@ -68,7 +68,7 @@ struct LoginView: View {
                 .foregroundStyle(.white)
                 .symbolEffect(.bounce, options: .repeating)
             
-            Text(isRegistering ? "Create Account" : "Fuck Interviews AI")
+            Text(isRegistering ? "Create Account" : "Next Job AI")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.white)
         }

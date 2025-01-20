@@ -94,17 +94,6 @@ final class AnthropicService {
         }
         self.apiKey = key
         
-        // Fetch resume analysis during initialization
-        Task {
-            if let userId = Auth.auth().currentUser?.uid {
-                do {
-                    self.resumeAnalysis = try await FirebaseManager.shared.getResumeAnalysis(userId: userId)
-                    print("Resume analysis loaded successfully")
-                } catch {
-                    print("Error loading resume analysis: \(error.localizedDescription)")
-                }
-            }
-        }
     }
     
     // MARK: - API Methods

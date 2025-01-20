@@ -16,19 +16,21 @@ struct InterviewAssistantApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authViewModel.isAuthenticated {
-                MainTabView().preferredColorScheme(.light)
-                // Additional force light mode at window level
-                .onAppear {
-                    UIWindow.appearance().overrideUserInterfaceStyle = .light
-                }
-            } else {
-                LoginView().preferredColorScheme(.light)
-                // Additional force light mode at window level
-                .onAppear {
-                    UIWindow.appearance().overrideUserInterfaceStyle = .light
+            Group {
+                if authViewModel.isAuthenticated {
+                    if authViewModel.showOnboarding {
+                        OnboardingView()
+                            .environmentObject(authViewModel)
+                    } else {
+                        MainTabView(selectedTab: authViewModel.isFirstTimeUser ? 2 : 0)
+                            .environmentObject(authViewModel)
+                    }
+                } else {
+                    LoginView()
+                        .environmentObject(authViewModel)
                 }
             }
+            .preferredColorScheme(.light)
         }
     }
 }

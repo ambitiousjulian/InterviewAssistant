@@ -78,8 +78,6 @@ class ResumeAnalyzer {
             request.httpBody = requestData
             
             print("\n🚀 Sending API Request...")
-            print("Request Headers: \(request.allHTTPHeaderFields ?? [:])")
-            print("Request Payload: \(String(data: requestData, encoding: .utf8) ?? "Unable to read payload")")
             
             let requestStartTime = Date()
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -93,7 +91,6 @@ class ResumeAnalyzer {
             }
             
             print("\n📥 Response Status Code: \(httpResponse.statusCode)")
-            print("Response Headers: \(httpResponse.allHeaderFields)")
             
             if httpResponse.statusCode != 200 {
                 let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"

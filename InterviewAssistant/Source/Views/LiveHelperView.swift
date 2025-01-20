@@ -60,7 +60,7 @@ struct LiveHelperView: View {
                     .transition(.move(edge: .bottom))
                 }
             }
-            .navigationTitle("Interview AI")
+            .navigationTitle("Live Interview Helper")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -227,12 +227,14 @@ struct LiveHelperView: View {
     
     private func showHelp() {
         let alert = UIAlertController(
-            title: "Fuck Interviews AI",
+            title: "Next Job AI",
             message: """
                 • Tap the microphone to start recording a question
                 • Use the camera to capture written questions
                 • Get instant help with your responses
                 • Clear button removes current question
+
+                Note: AI responses are generated in real-time and may occasionally contain inaccuracies. Please verify any specific claims or technical details.
                 """,
             preferredStyle: .alert
         )
