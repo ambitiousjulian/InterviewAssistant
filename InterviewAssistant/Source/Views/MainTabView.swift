@@ -2,27 +2,31 @@ import SwiftUI
 import FirebaseAuth
 
 struct MainTabView: View {
+    @State var selectedTab: Int 
+    
+    init(selectedTab: Int = 0) {
+        _selectedTab = State(initialValue: selectedTab)
+    }
+    
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             LiveHelperView()
                 .tabItem {
                     Label("Live Help", systemImage: "waveform.circle.fill")
                 }
+                .tag(0)
             
             MockInterviewView()
                 .tabItem {
                     Label("Practice", systemImage: "person.2.fill")
                 }
-            
-//            HistoryView()
-//                .tabItem {
-//                    Label("History", systemImage: "clock.fill")
-//                }
+                .tag(1)
             
             ProfileView()
-                            .tabItem {
-                                Label("Profile", systemImage: "person.circle.fill")
-                            }
+                .tabItem {
+                    Label("Profile", systemImage: "person.circle.fill")
+                }
+                .tag(2)
         }
         .tint(AppTheme.primary)
     }

@@ -1,61 +1,56 @@
-//
-//  UserProfile.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-//
-//  User.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-
-//
-//  UserProfile.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-
-// Source/Models/UserProfile.swift
 import Foundation
+import FirebaseCore
 
-struct UserProfile: Codable, Equatable {
-    var id: String
-    var name: String
+struct User: Codable, Identifiable, Equatable {
+    let id: String
     var email: String
-    var jobPreferences: JobPreferences
-    var experience: Experience
+    var name: String
+    var resumeAnalysis: ResumeAnalysis?
     
-    struct JobPreferences: Codable, Equatable {
-        var targetRole: String
-        var targetIndustry: String
-        var experienceLevel: ExperienceLevel
+    struct ResumeAnalysis: Codable, Equatable {
+        var skills: [String]
+        var summary: String
+        var lastUpdated: Date
         
-        enum ExperienceLevel: String, Codable, CaseIterable {
-            case entry = "Entry Level"
-            case midLevel = "Mid Level"
-            case senior = "Senior Level"
-            case executive = "Executive"
+        enum CodingKeys: String, CodingKey {
+            case skills
+            case summary
+            case lastUpdated
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            skills = try container.decode([String].self, forKey: .skills)
+            summary = try container.decode(String.self, forKey: .summary)
+            
+            // Handle Timestamp conversion
+            if let timestamp = try? container.decode(Timestamp.self, forKey: .lastUpdated) {
+                lastUpdated = timestamp.dateValue()
+            } else {
+                lastUpdated = Date()
+            }
+        }
+        
+        init(skills: [String], summary: String, lastUpdated: Date) {
+            self.skills = skills
+            self.summary = summary
+            self.lastUpdated = lastUpdated
         }
     }
     
-    struct Experience: Codable, Equatable {
-        var yearsOfExperience: Int
-        var currentRole: String
-        var currentIndustry: String
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case name
+        case resumeAnalysis
     }
-    
-    // Custom Equatable implementation if needed
-    static func == (lhs: UserProfile, rhs: UserProfile) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.name == rhs.name &&
-               lhs.email == rhs.email &&
-               lhs.jobPreferences == rhs.jobPreferences &&
-               lhs.experience == rhs.experience
+}
+
+extension User.ResumeAnalysis {
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(skills, forKey: .skills)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(Timestamp(date: lastUpdated), forKey: .lastUpdated)
     }
 }

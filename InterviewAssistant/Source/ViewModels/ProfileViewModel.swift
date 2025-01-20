@@ -1,89 +1,127 @@
-//
-//  ProfileViewModel.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
-
 import SwiftUI
 import FirebaseAuth
 
 class ProfileViewModel: ObservableObject {
-    @Published var name = ""
-    @Published var targetRole = ""
-    @Published var targetIndustry = ""
-    @Published var experienceLevel = UserProfile.JobPreferences.ExperienceLevel.entry
-    @Published var yearsOfExperience = 0
-    @Published var currentRole = ""
-    @Published var currentIndustry = ""
-    
+    @Published var user: User?
     @Published var isLoading = false
     @Published var showingSaveAlert = false
+    @Published var showingResumeInput = false
+    @Published var resumeText = ""
+    @Published var resumeAnalysisError: String?
+    @Published var errorMessage: String?
     
-    private var originalProfile: UserProfile?
-    
+    private var originalUser: User?
+
     var hasChanges: Bool {
-        let currentProfile = createProfile()
-        return originalProfile != currentProfile
+        return originalUser != user
     }
     
     init() {
         loadProfile()
     }
     
+    // MARK: - Load Profile
     func loadProfile() {
-        // TODO: Load from Firebase/local storage
-        // For now, we'll use mock data
         isLoading = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.isLoading = false
-            // Mock data
-            self.name = "John Doe"
-            self.targetRole = "iOS Developer"
-            self.targetIndustry = "Technology"
-            self.experienceLevel = .midLevel
-            self.yearsOfExperience = 3
-            self.currentRole = "Junior Developer"
-            self.currentIndustry = "Software"
-            
-            self.originalProfile = self.createProfile()
+        Task {
+            do {
+                if let currentUser = try await FirebaseManager.shared.getCurrentUser() {
+                    await MainActor.run {
+                        self.user = currentUser
+                        self.originalUser = currentUser
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.errorMessage = "No user found"
+                        self.isLoading = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
         }
     }
     
+    // MARK: - Save Profile
     func saveProfile() {
+        guard let updatedUser = user else { return }
         isLoading = true
-        // TODO: Save to Firebase/local storage
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.isLoading = false
-            self.showingSaveAlert = true
-            self.originalProfile = self.createProfile()
+        Task {
+            do {
+                try await FirebaseManager.shared.updateUserProfile(updatedUser)
+                await MainActor.run {
+                    self.originalUser = updatedUser
+                    self.isLoading = false
+                    self.showingSaveAlert = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
         }
     }
     
+    // MARK: - Analyze and Save Resume
+    func analyzeAndSaveResume() {
+        guard !resumeText.isEmpty else { return }
+        isLoading = true
+        Task {
+            do {
+                let analysis = try await ResumeAnalyzer.shared.analyzeResume(resumeText)
+                
+                if var updatedUser = user {
+                    updatedUser.resumeAnalysis = analysis
+                    try await FirebaseManager.shared.updateUserProfile(updatedUser)
+                    
+                    await MainActor.run {
+                        self.user = updatedUser
+                        self.originalUser = updatedUser
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ResumeAnalysisUpdated"),
+                            object: nil,
+                            userInfo: ["analysis": analysis]
+                        )
+                        self.isLoading = false
+                        self.showingResumeInput = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.resumeAnalysisError = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Sign Out
     func signOut() {
-        do {
-            try Auth.auth().signOut()
-        } catch {
-            print("Error signing out: \(error.localizedDescription)")
+        Task {
+            do {
+                try FirebaseManager.shared.signOut()
+                await MainActor.run {
+                    self.user = nil
+                    self.originalUser = nil
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
     
-    private func createProfile() -> UserProfile {
-        UserProfile(
-            id: Auth.auth().currentUser?.uid ?? "",
-            name: name,
-            email: Auth.auth().currentUser?.email ?? "",
-            jobPreferences: .init(
-                targetRole: targetRole,
-                targetIndustry: targetIndustry,
-                experienceLevel: experienceLevel
-            ),
-            experience: .init(
-                yearsOfExperience: yearsOfExperience,
-                currentRole: currentRole,
-                currentIndustry: currentIndustry
-            )
-        )
+    // MARK: - Helper Methods
+    func updateUserField(_ keyPath: WritableKeyPath<User, String>, value: String) {
+        if var updatedUser = user {
+            updatedUser[keyPath: keyPath] = value
+            user = updatedUser
+        }
     }
 }

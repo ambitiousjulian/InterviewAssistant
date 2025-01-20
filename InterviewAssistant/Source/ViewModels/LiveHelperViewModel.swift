@@ -43,9 +43,23 @@ class LiveHelperViewModel: ObservableObject {
             
             self.anthropicService = try AnthropicService()
             self.anthropicService.delegate = self  // Add this line
+            
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(resumeAnalysisUpdated),
+                name: NSNotification.Name("ResumeAnalysisUpdated"),
+                object: nil
+            )
         } catch {
             print("❌ Anthropic Service Error: \(error.localizedDescription)")
             fatalError("Failed to initialize Anthropic service: \(error.localizedDescription)")
+        }
+    }
+    
+    @objc private func resumeAnalysisUpdated(_ notification: Notification) {
+        if let analysis = notification.userInfo?["analysis"] as? User.ResumeAnalysis {
+            anthropicService.updateResumeAnalysis(analysis)
+            print("[DEBUG] Resume analysis updated in LiveHelperViewModel")
         }
     }
     

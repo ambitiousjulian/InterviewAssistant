@@ -1,119 +1,59 @@
-//
-//  ProfileView.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
 import SwiftUI
 import FirebaseAuth
 
 struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
-    @State private var showingSignOutAlert = false
     @State private var isAnimating = false
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 25) {
-                    // Profile Header
-                    profileHeader
-                        .offset(y: isAnimating ? 0 : -30)
-                    
-                    // Main Content Cards
-                    VStack(spacing: 20) {
-                        // Personal Info
-                        ProfileCard(title: "Personal Info", icon: "person.fill") {
-                            VStack(spacing: 15) {
-                                ProfileTextField(
-                                    title: "Name",
-                                    text: $viewModel.name,
-                                    icon: "person.text.rectangle"
-                                )
-                                
-                                ProfileTextField(
-                                    title: "Email",
-                                    text: .constant(Auth.auth().currentUser?.email ?? ""),
-                                    icon: "envelope.fill",
-                                    isDisabled: true
-                                )
-                            }
-                        }
-                        
-                        // Job Preferences
-                        ProfileCard(title: "Job Preferences", icon: "briefcase.fill") {
-                            VStack(spacing: 15) {
-                                ProfileTextField(
-                                    title: "Target Role",
-                                    text: $viewModel.targetRole,
-                                    icon: "target"
-                                )
-                                
-                                ProfileTextField(
-                                    title: "Target Industry",
-                                    text: $viewModel.targetIndustry,
-                                    icon: "building.2"
-                                )
-                                
-                                ExperiencePicker(selection: $viewModel.experienceLevel)
-                            }
-                        }
-                        
-                        // Current Experience
-                        ProfileCard(title: "Current Experience", icon: "clock.fill") {
-                            VStack(spacing: 15) {
-                                ExperienceStepper(
-                                    value: $viewModel.yearsOfExperience,
-                                    range: 0...50
-                                )
-                                
-                                ProfileTextField(
-                                    title: "Current Role",
-                                    text: $viewModel.currentRole,
-                                    icon: "person.text.rectangle"
-                                )
-                                
-                                ProfileTextField(
-                                    title: "Current Industry",
-                                    text: $viewModel.currentIndustry,
-                                    icon: "building"
-                                )
-                            }
-                        }
-                        
-                        // Action Buttons
-                        actionButtons
-                    }
-                    .padding(.horizontal)
-                    .offset(y: isAnimating ? 0 : 30)
-                }
-            }
-            .background(
-                backgroundGradient
-                    .opacity(0.1)
+            ZStack {
+                AppTheme.background
                     .ignoresSafeArea()
-            )
+                
+                ScrollView {
+                    VStack(spacing: 25) {
+                        profileHeader
+                            .offset(y: isAnimating ? 0 : -30)
+                        
+                        mainContent
+                            .offset(y: isAnimating ? 0 : 30)
+                    }
+                    .padding(.bottom, 30)
+                }
+            }
             .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("Sign Out", isPresented: $showingSignOutAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Sign Out", role: .destructive) {
-                    viewModel.signOut()
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .tint(AppTheme.primary)
+                    }
                 }
             }
-            .alert("Profile Updated", isPresented: $viewModel.showingSaveAlert) {
-                Button("OK") { }
+            .sheet(isPresented: $viewModel.showingResumeInput) {
+                ResumeInputView(viewModel: viewModel)
             }
-            .overlay {
-                if viewModel.isLoading {
-                    LoadingView()
+            .alert("Success", isPresented: $viewModel.showingSaveAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Your profile has been updated successfully.")
+            }
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK", role: .cancel) {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let error = viewModel.errorMessage {
+                    Text(error)
                 }
             }
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.8)) {
-                isAnimating = true
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.8)) {
+                    isAnimating = true
+                }
             }
         }
     }
@@ -131,16 +71,162 @@ struct ProfileView: View {
             }
             
             VStack(spacing: 5) {
-                Text(viewModel.name.isEmpty ? "Add Your Name" : viewModel.name)
+                Text(viewModel.user?.name ?? "Add Your Name")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(AppTheme.text)
                 
                 Text(Auth.auth().currentUser?.email ?? "")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(AppTheme.text.opacity(0.7))
             }
         }
         .padding(.vertical, 20)
+    }
+    
+    private var mainContent: some View {
+        VStack(spacing: 20) {
+            personalInfoCard
+            resumeCard
+            actionButtons
+        }
+        .padding(.horizontal)
+    }
+    
+    // First, update the CustomTextField implementation:
+    struct CustomTextField: View {
+        let placeholder: String
+        @Binding var text: String
+        let systemImage: String
+        var isDisabled: Bool = false
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(placeholder)
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.text.opacity(0.7))
+                
+                HStack {
+                    Image(systemName: systemImage)
+                        .foregroundColor(AppTheme.primary)
+                        .frame(width: 20)
+                    
+                    TextField(placeholder, text: $text)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .disabled(isDisabled)
+                }
+                .padding()
+                .background(AppTheme.surface)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    // Then update the personalInfoCard implementation:
+    private var personalInfoCard: some View {
+        ProfileCard(title: "Personal Information", icon: "person.fill") {
+            VStack(spacing: 15) {
+                CustomTextField(
+                    placeholder: "Full Name",
+                    text: Binding(
+                        get: { viewModel.user?.name ?? "" },
+                        set: { viewModel.updateUserField(\.name, value: $0) }
+                    ),
+                    systemImage: "person.text.rectangle"
+                )
+                
+                CustomTextField(
+                    placeholder: "Email Address",
+                    text: .constant(Auth.auth().currentUser?.email ?? ""),
+                    systemImage: "envelope.fill",
+                    isDisabled: true
+                )
+            }
+        }
+    }
+    
+    private var resumeCard: some View {
+        ProfileCard(title: "Resume", icon: "doc.text.fill") {
+            VStack(spacing: 15) {
+                if let resumeAnalysis = viewModel.user?.resumeAnalysis {
+                    resumeAnalysisView(resumeAnalysis)
+                } else {
+                    resumeUploadPrompt
+                }
+            }
+        }
+    }
+    
+    private var resumeUploadPrompt: some View {
+        Button {
+            viewModel.showingResumeInput = true
+        } label: {
+            VStack(spacing: 12) {
+                Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 30))
+                    .foregroundColor(AppTheme.primary)
+                
+                Text("Upload Resume")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.primary)
+                
+                Text("We'll analyze your resume to enhance your interview preparation.")
+                    .font(.caption)
+                    .foregroundColor(AppTheme.text.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(AppTheme.primary.opacity(0.1))
+            .cornerRadius(12)
+        }
+    }
+    
+    private func resumeAnalysisView(_ analysis: User.ResumeAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Resume Uploaded")
+                        .font(.headline)
+                        .foregroundColor(AppTheme.secondary)
+                    
+                    Text("Last updated: \(analysis.lastUpdated.formatted(.dateTime.day().month()))")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.text.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Button {
+                    viewModel.showingResumeInput = true
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundColor(AppTheme.primary)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Key Skills")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                FlowLayout(spacing: 8) {
+                    ForEach(analysis.skills, id: \.self) { skill in
+                        Text(skill)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(AppTheme.primary.opacity(0.1))
+                            .foregroundColor(AppTheme.primary)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+        }
     }
     
     private var actionButtons: some View {
@@ -155,16 +241,16 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(viewModel.hasChanges ? AppTheme.primary : AppTheme.primary.opacity(0.3))
-                .foregroundColor(.white)
+                .foregroundColor(AppTheme.surface)
                 .cornerRadius(15)
             }
             .disabled(!viewModel.hasChanges)
             
             Button {
-                showingSignOutAlert = true
+                viewModel.signOut()
             } label: {
                 HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                    Image(systemName: "rectangle.portrait.and.arrow.right.fill")
                     Text("Sign Out")
                 }
                 .frame(maxWidth: .infinity)
@@ -173,23 +259,57 @@ struct ProfileView: View {
                 .foregroundColor(.red)
                 .cornerRadius(15)
             }
+            
+            Button {
+                viewModel.user?.resumeAnalysis = nil
+                viewModel.saveProfile()
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                    Text("Clear Resume Analysis")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(AppTheme.text.opacity(0.1))
+                .foregroundColor(AppTheme.text)
+                .cornerRadius(15)
+            }
         }
-        .padding(.vertical)
-    }
-    
-    private var backgroundGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                AppTheme.primary.opacity(0.1),
-                AppTheme.secondary.opacity(0.05)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
+//
+//struct CustomTextField: View {
+//    let title: String
+//    @Binding var text: String
+//    let icon: String
+//    var isDisabled: Bool = false
+//    
+//    var body: some View {
+//        VStack(alignment: .leading, spacing: 8) {
+//            Text(title)
+//                .font(.subheadline)
+//                .foregroundColor(AppTheme.text.opacity(0.7))
+//            
+//            HStack {
+//                Image(systemName: icon)
+//                    .foregroundColor(AppTheme.primary)
+//                    .frame(width: 20)
+//                
+//                TextField(title, text: $text)
+//                    .textFieldStyle(PlainTextFieldStyle())
+//                    .disabled(isDisabled)
+//            }
+//            .padding()
+//            .background(AppTheme.surface)
+//            .cornerRadius(10)
+//            .overlay(
+//                RoundedRectangle(cornerRadius: 10)
+//                    .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+//            )
+//        }
+//    }
+//}
 
-// MARK: - Supporting Views
 struct ProfileCard<Content: View>: View {
     let title: String
     let icon: String
@@ -202,107 +322,69 @@ struct ProfileCard<Content: View>: View {
                     .foregroundColor(AppTheme.primary)
                 Text(title)
                     .font(.headline)
+                    .foregroundColor(AppTheme.text)
             }
+            .padding(.bottom, 5)
             
             content()
         }
         .padding()
-        .background(Color.white)
+        .background(AppTheme.surface)
         .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .shadow(color: AppTheme.shadowLight, radius: 10, x: 0, y: 5)
     }
 }
 
-struct ProfileTextField: View {
-    let title: String
-    @Binding var text: String
-    let icon: String
-    var isDisabled: Bool = false
+// Helper view for flowing layout of skills
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(AppTheme.primary)
-                TextField("", text: $text)
-                    .disabled(isDisabled)
-            }
-            .padding()
-            .background(AppTheme.surface)
-            .cornerRadius(12)
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: result.positions[index].x + bounds.minX,
+                                    y: result.positions[index].y + bounds.minY),
+                         proposal: ProposedViewSize(result.sizes[index]))
         }
     }
-}
-
-struct ExperiencePicker: View {
-    @Binding var selection: UserProfile.JobPreferences.ExperienceLevel
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Experience Level")
-                .font(.caption)
-                .foregroundColor(.gray)
+    struct FlowResult {
+        var positions: [CGPoint]
+        var sizes: [CGSize]
+        var size: CGSize
+        
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var positions: [CGPoint] = []
+            var sizes: [CGSize] = []
             
-            Picker("", selection: $selection) {
-                ForEach(UserProfile.JobPreferences.ExperienceLevel.allCases, id: \.self) { level in
-                    Text(level.rawValue).tag(level)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-}
-
-struct ExperienceStepper: View {
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-    
-    var body: some View {
-        HStack {
-            Text("Years of Experience")
-                .font(.caption)
-                .foregroundColor(.gray)
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var rowHeight: CGFloat = 0
+            var rowMaxY: CGFloat = 0
             
-            Spacer()
-            
-            HStack {
-                Button {
-                    if value > range.lowerBound {
-                        value -= 1
-                    }
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .foregroundColor(AppTheme.primary)
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if x + size.width > maxWidth && !positions.isEmpty {
+                    x = 0
+                    y = rowMaxY + spacing
                 }
                 
-                Text("\(value)")
-                    .frame(minWidth: 40)
-                    .font(.headline)
+                positions.append(CGPoint(x: x, y: y))
+                sizes.append(size)
                 
-                Button {
-                    if value < range.upperBound {
-                        value += 1
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(AppTheme.primary)
-                }
+                rowHeight = max(rowHeight, size.height)
+                rowMaxY = y + rowHeight
+                x += size.width + spacing
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(AppTheme.surface)
-            .cornerRadius(12)
+            
+            self.positions = positions
+            self.sizes = sizes
+            self.size = CGSize(width: maxWidth, height: rowMaxY)
         }
-    }
-}
-
-// MARK: - Preview
-struct ProfileView_Previews: PreviewProvider {
-    static var previews: some View {
-        ProfileView()
     }
 }

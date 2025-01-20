@@ -1,19 +1,7 @@
-//
-//  AnthropicService.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-//
-//  AnthropicService.swift
-//  InterviewAssistant
-//
-//  Created by Julian Cajuste on 1/12/25.
-//
-
 import Foundation
 import NaturalLanguage
 import UIKit
+import FirebaseAuth
 
 // MARK: - Protocols
 protocol AnthropicServiceDelegate: AnyObject {
@@ -69,20 +57,35 @@ final class AnthropicService {
     private let apiKey: String
     private let baseURL = "https://api.anthropic.com/v1/messages"
     weak var delegate: AnthropicServiceDelegate?
+    private var resumeAnalysis: User.ResumeAnalysis?
     
-    private let systemPrompt = """
-    You are an expert interviewer and career coach for all fields and positions, including technical, creative, and business roles. When answering questions:
-    - Adapt your response to the specific field and position context.
-    - Use clear, concise, and impactful language relevant to the question.
-    - Interpret ambiguous terms or incomplete questions in context, ensuring the most likely intended meaning is addressed.
-    - Avoid unnecessary reasoning or apologies and directly provide the best possible answer.
+    private func createSystemPrompt() -> String {
+        var prompt = """
+        You are an expert interviewer and career coach for all fields and positions, including technical, creative, and business roles. When answering questions:
+        - Adapt your response to the specific field and position context.
+        - Use clear, concise, and impactful language relevant to the question.
+        - Interpret ambiguous terms or incomplete questions in context, ensuring the most likely intended meaning is addressed.
+        - Avoid unnecessary reasoning or apologies and directly provide the best possible answer.
+        - Answer using the candidate's context for a more personal answer, when applicable.
+        """
+        
+        if let analysis = resumeAnalysis {
+            prompt += "\n\nCANDIDATE CONTEXT:"
+            prompt += "\nSkills: \(analysis.skills.joined(separator: ", "))"
+            prompt += "\nProfessional Summary: \(analysis.summary)"
+            prompt += "\n\nPlease tailor responses to align with the candidate's background and expertise."
+        }
+        
+        prompt += """
+        \n\nQUESTION TYPE:
+        [Behavioral, technical, situational, creative, leadership, etc.]
 
-    QUESTION TYPE:
-    [Behavioral, technical, situational, creative, leadership, etc.]
-
-    SUGGESTED RESPONSE:
-    [Provide a clear, concise, and professional response tailored to the specific field and position. Use STAR for behavioral questions. For technical fields, focus on accuracy and clarity. For creative roles, emphasize innovation and unique approaches. Keep responses under 512 tokens.]
-    """
+        SUGGESTED RESPONSE:
+        [Provide a clear, concise, and professional response tailored to the specific field and position. Use STAR for behavioral questions. For technical fields, focus on accuracy and clarity. For creative roles, emphasize innovation and unique approaches. Keep responses under 512 tokens.]
+        """
+        
+        return prompt
+    }
 
     // MARK: - Initialization
     init() throws {
@@ -90,6 +93,7 @@ final class AnthropicService {
             throw AnthropicError.invalidAPIKey
         }
         self.apiKey = key
+        
     }
     
     // MARK: - API Methods
@@ -113,7 +117,7 @@ final class AnthropicService {
             "max_tokens": 512,
             "temperature": 0.7,
             "stream": true,
-            "system": systemPrompt,
+            "system": createSystemPrompt(),
             "messages": [
                 [
                     "role": "user",
@@ -172,5 +176,10 @@ final class AnthropicService {
         }
         
         return correctedWords.joined(separator: " ")
+    }
+    
+    func updateResumeAnalysis(_ analysis: User.ResumeAnalysis?) {
+        self.resumeAnalysis = analysis
+        print("[DEBUG] AnthropicService updated with resume analysis: \(analysis?.skills ?? [])")
     }
 }
