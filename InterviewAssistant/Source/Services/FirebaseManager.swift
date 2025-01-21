@@ -1,4 +1,5 @@
 import Firebase
+import FirebaseCore
 import FirebaseAuth
 import FirebaseFirestore
 import Foundation
@@ -9,6 +10,9 @@ enum FirebaseError: LocalizedError {
     case invalidData
     case networkError
     case unknownError(String)
+    case reauthenticationRequired
+    case deletionError
+    case userDataDeletionError
     
     var errorDescription: String? {
         switch self {
@@ -22,6 +26,12 @@ enum FirebaseError: LocalizedError {
             return "Network connection error"
         case .unknownError(let message):
             return message
+        case .reauthenticationRequired:
+            return "Please re-enter your password to continue"
+        case .deletionError:
+            return "Failed to delete account"
+        case .userDataDeletionError:
+            return "Failed to delete user data"
         }
     }
 }
@@ -165,5 +175,128 @@ class FirebaseManager {
             name: firebaseUser.displayName ?? "",
             resumeAnalysis: nil
         )
+    }
+    
+    // Main deletion method
+    func deleteUserAccount(password: String) async throws {
+        guard let currentUser = Auth.auth().currentUser,
+              let email = currentUser.email else {
+            throw FirebaseError.notSignedIn
+        }
+        
+        do {
+            // 1. Reauthenticate user
+            let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+            try await currentUser.reauthenticate(with: credential)
+            
+            // 2. Delete all user data
+            try await deleteAllUserData(userId: currentUser.uid)
+            
+            // 3. Delete authentication account
+            try await currentUser.delete()
+            
+            // 4. Clear local storage
+            clearLocalStorage(for: currentUser.uid)
+            
+            // 5. Sign out
+            try Auth.auth().signOut()
+            
+        } catch let error as NSError {
+            switch error.code {
+            case AuthErrorCode.requiresRecentLogin.rawValue:
+                throw FirebaseError.reauthenticationRequired
+            case AuthErrorCode.weakPassword.rawValue:
+                throw FirebaseError.invalidData
+            default:
+                throw FirebaseError.deletionError
+            }
+        }
+    }
+    
+    // Delete all user data from Firestore
+    private func deleteAllUserData(userId: String) async throws {
+        do {
+            // Delete user document
+            try await db.collection("users").document(userId).delete()
+            
+            // Delete resume analysis
+            try await deleteResumeAnalysis(userId: userId)
+            
+            // Add any other data deletion here
+            // Example: Delete user's chat history, preferences, etc.
+            
+        } catch {
+            throw FirebaseError.userDataDeletionError
+        }
+    }
+    
+    // Delete resume analysis specifically
+    private func deleteResumeAnalysis(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "resumeAnalysis": FieldValue.delete()
+            ])
+        } catch {
+            print("[WARNING] Failed to delete resume analysis: \(error.localizedDescription)")
+            // Don't throw here, as this is not critical
+        }
+    }
+    
+    // Clear local storage
+    private func clearLocalStorage(for userId: String) {
+        let userDefaults = UserDefaults.standard
+        let keysToRemove = [
+            "hasCompletedOnboarding_\(userId)",
+            "isFirstTimeUser_\(userId)",
+            // Add any other user-specific keys
+        ]
+        
+        keysToRemove.forEach { key in
+            userDefaults.removeObject(forKey: key)
+        }
+        userDefaults.synchronize()
+    }
+    
+    // Verify deletion
+    func verifyDeletion(userId: String) async throws -> Bool {
+        do {
+            let document = try await db.collection("users").document(userId).getDocument()
+            return !document.exists
+        } catch {
+            throw FirebaseError.networkError
+        }
+    }
+    
+    private func logDeletionRequest(userId: String) async {
+        do {
+            try await db.collection("deletion_logs").addDocument(data: [
+                "userId": userId,
+                "requestedAt": FieldValue.serverTimestamp(),
+                "status": "requested",
+                "platform": "iOS",
+                "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+            ])
+        } catch {
+            print("[WARNING] Failed to log deletion request: \(error.localizedDescription)")
+        }
+    }
+    
+    private func updateDeletionLog(userId: String, status: String) async {
+        do {
+            let query = db.collection("deletion_logs")
+                .whereField("userId", isEqualTo: userId)
+                .whereField("status", isEqualTo: "requested")
+                .limit(to: 1)
+            
+            let documents = try await query.getDocuments()
+            if let document = documents.documents.first {
+                try await document.reference.updateData([
+                    "status": status,
+                    "completedAt": FieldValue.serverTimestamp()
+                ])
+            }
+        } catch {
+            print("[WARNING] Failed to update deletion log: \(error.localizedDescription)")
+        }
     }
 }
