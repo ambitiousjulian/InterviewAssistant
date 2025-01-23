@@ -5,6 +5,7 @@ import Foundation
 import Vision
 import VisionKit
 import UIKit
+import FirebaseAuth
 
 class LiveHelperViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -25,6 +26,9 @@ class LiveHelperViewModel: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var currentUserId: String? {
+        return Auth.auth().currentUser?.uid
+    }
     
     // MARK: - Initialization
     init() {
@@ -42,18 +46,35 @@ class LiveHelperViewModel: ObservableObject {
             }
             
             self.anthropicService = try AnthropicService()
-            self.anthropicService.delegate = self  // Add this line
+            self.anthropicService.delegate = self
             
+            // Load resume analysis immediately
+            loadResumeAnalysis()
+            
+            // Add observers
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(resumeAnalysisUpdated),
                 name: NSNotification.Name("ResumeAnalysisUpdated"),
                 object: nil
             )
+            
+            // Add observer for app becoming active
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(appBecameActive),
+                name: UIApplication.didBecomeActiveNotification,
+                object: nil
+            )
+            
         } catch {
             print("❌ Anthropic Service Error: \(error.localizedDescription)")
             fatalError("Failed to initialize Anthropic service: \(error.localizedDescription)")
         }
+    }
+    
+    @objc private func appBecameActive() {
+        loadResumeAnalysis()
     }
     
     @objc private func resumeAnalysisUpdated(_ notification: Notification) {
@@ -129,6 +150,23 @@ class LiveHelperViewModel: ObservableObject {
             processQuestion()
         } else {
             reset()
+        }
+    }
+    
+    func loadResumeAnalysis() {
+        guard let userId = currentUserId else { return }
+        
+        Task {
+            do {
+                if let analysis = try await FirebaseManager.shared.getResumeAnalysis(userId: userId) {
+                    await MainActor.run {
+                        self.anthropicService.updateResumeAnalysis(analysis)
+                        print("[DEBUG] Resume analysis loaded successfully")
+                    }
+                }
+            } catch {
+                print("[ERROR] Failed to load resume analysis: \(error)")
+            }
         }
     }
     
@@ -305,6 +343,10 @@ class LiveHelperViewModel: ObservableObject {
             self?.isProcessing = false
             self?.isRecording = false
         }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 

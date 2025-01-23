@@ -85,6 +85,8 @@ struct LiveHelperView: View {
             withAnimation(.easeOut(duration: 0.8)) {
                 isAnimating = true
             }
+            viewModel.loadResumeAnalysis()
+
         }
     }
     

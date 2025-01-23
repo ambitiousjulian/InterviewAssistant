@@ -81,7 +81,7 @@ final class AnthropicService {
         [Behavioral, technical, situational, creative, leadership, etc.]
 
         SUGGESTED RESPONSE:
-        [Provide a clear, concise, and professional response tailored to the specific field and position. Use STAR for behavioral questions. For technical fields, focus on accuracy and clarity. For creative roles, emphasize innovation and unique approaches. Keep responses under 512 tokens.]
+        [Provide a clear, concise, and professional response tailored to the specific field and position. Use STAR for behavioral questions. For technical fields, focus on accuracy and clarity. For creative roles, emphasize innovation and unique approaches. Focus on making the answer straight to the point with minimal fluff. Keep responses under 512 tokens.]
         """
         
         return prompt
@@ -122,7 +122,7 @@ final class AnthropicService {
                 [
                     "role": "user",
                     "content": """
-                    Provide a concise and tailored response for this interview question. Focus on the relevant field, position, and context, ensuring the answer is impactful and aligns with industry expectations, while keeping a casual tone. Speak in first person, like you are the one being interviewed: \(cleanedQuestion)
+                    Provide a concise and tailored response for this interview question. Focus on the relevant field, position, and context, ensuring the answer is impactful and aligns with industry expectations, while keeping a casual tone. Speak in first person, like you are the one being interviewed. Focus on making the answer straight to the point with minimal fluff.: \(cleanedQuestion)
                     """
                 ]
             ]
