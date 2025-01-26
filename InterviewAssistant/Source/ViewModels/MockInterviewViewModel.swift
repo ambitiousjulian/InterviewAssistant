@@ -12,7 +12,8 @@ import Foundation
 import Vision
 import VisionKit
 import UIKit
-class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
+
+class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelegate {
     // MARK: - Published Properties
     @Published var interview: MockInterview?
     @Published var currentState: InterviewState = .setup
@@ -43,8 +44,9 @@ class MockInterviewViewModel: ObservableObject, AnthropicServiceDelegate {
     }
     
     // MARK: - Initialization
-    init() {
+    override init() {
         self.anthropicService = try! AnthropicService()
+        super.init()
         self.anthropicService.delegate = self
     }
     

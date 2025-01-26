@@ -2,7 +2,7 @@ import SwiftUI
 import FirebaseAuth
 
 struct MainTabView: View {
-    @State var selectedTab: Int 
+    @State var selectedTab: Int
     
     init(selectedTab: Int = 0) {
         _selectedTab = State(initialValue: selectedTab)
@@ -16,7 +16,7 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            MockInterviewView()
+            InterviewOptionsView()
                 .tabItem {
                     Label("Practice", systemImage: "person.2.fill")
                 }
@@ -32,33 +32,56 @@ struct MainTabView: View {
     }
 }
 
-struct InterviewListView: View {
+// New view to choose interview type
+struct InterviewOptionsView: View {
     var body: some View {
         NavigationView {
             List {
-                ForEach(0..<5) { _ in
-                    InterviewRowView()
+                NavigationLink(destination: MockInterviewView()) {
+                    InterviewOptionRow(
+                        title: "Traditional Interview",
+                        description: "Text-based mock interview with AI feedback",
+                        icon: "text.bubble.fill"
+                    )
+                }
+                
+                NavigationLink(destination: ConversationalInterviewView()) {
+                    InterviewOptionRow(
+                        title: "Voice Interview",
+                        description: "Interactive voice-based interview with AI",
+                        icon: "waveform.circle.fill"
+                    )
                 }
             }
-            .navigationTitle("Interviews")
-            .toolbar {
-                Button(action: {}) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(AppTheme.primary)
-                }
-            }
+            .navigationTitle("Interview Practice")
         }
     }
 }
 
-struct InterviewRowView: View {
+struct InterviewOptionRow: View {
+    let title: String
+    let description: String
+    let icon: String
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Mock Interview")
-                .font(.headline)
-            Text("Scheduled for tomorrow")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        HStack(spacing: 15) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(AppTheme.primary)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(AppTheme.primary.opacity(0.1))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
         }
         .padding(.vertical, 8)
     }
