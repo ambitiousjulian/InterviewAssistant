@@ -12,7 +12,7 @@ import Speech
 
 struct ConversationalInterviewView: View {
     @StateObject private var viewModel = ConversationalInterviewViewModel()
-    @Environment(\.dismiAiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var isAnimating = false
     
     var body: some View {
@@ -132,6 +132,19 @@ struct ConversationalInterviewView: View {
             .offset(y: isAnimating ? 0 : 20)
             .opacity(isAnimating ? 1 : 0)
             
+            // Add this before the Start Interview button
+            Toggle(isOn: $viewModel.shouldAutoStartSpeech) {
+                HStack {
+                    Image(systemName: "waveform.circle.fill")
+                    Text("Auto AI Speaking")
+                }
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(AppTheme.purple)
+            }
+            .padding(.horizontal)
+            .tint(AppTheme.purple)
+
+            
             Button(action: {
                 withAnimation(.spring()) {
                     viewModel.startInterview()
@@ -172,6 +185,7 @@ struct ConversationalInterviewView: View {
     }
     
     private var voiceInterviewView: some View {
+        
         VStack(spacing: 20) {
             // Progress indicator
             ProgressView(value: Double(viewModel.interview?.currentQuestionIndex ?? 0),
@@ -190,12 +204,17 @@ struct ConversationalInterviewView: View {
                         Image(systemName: "waveform.circle.fill")
                             .foregroundColor(AppTheme.primary)
                             .font(.title)
+                            .symbolEffect(.bounce, options: .repeating) // iOS 17+
                         Text("AI Speaking...")
                             .foregroundColor(AppTheme.primary)
+                            .font(.headline)
                     }
                     .padding()
-                    .background(Color.white.opacity(0.9))
-                    .cornerRadius(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 15)
+                            .fill(Color.white.opacity(0.95))
+                            .shadow(color: AppTheme.primary.opacity(0.2), radius: 5)
+                    )
                 }
                 
                 // Voice response section
@@ -206,26 +225,38 @@ struct ConversationalInterviewView: View {
                             .padding()
                     }
                     
-                    if !viewModel.transcribedText.isEmpty {
-                        Text(viewModel.transcribedText)
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(10)
-                    }
-                    
                     // Updated recording controls
                     HStack {
-                        Button(action: {
-                            viewModel.speakCurrentQuestion()
-                        }) {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.title)
-                                .foregroundColor(.blue)
+                        // Only show start button if not recording or AI speaking
+                        if !viewModel.isListening && !viewModel.isAISpeaking {
+                            Button(action: {
+                                viewModel.speakCurrentQuestion()
+                            }) {
+                                HStack {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.title2)
+                                    Text("Start")
+                                        .fontWeight(.medium)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(
+                                    LinearGradient(
+                                        colors: [AppTheme.primary, AppTheme.secondary],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .foregroundColor(.white)
+                                .cornerRadius(25)
+                                .shadow(color: AppTheme.primary.opacity(0.3), radius: 5)
+                            }
+                            .transition(.scale.combined(with: .opacity))
                         }
-                        .disabled(viewModel.isAISpeaking || viewModel.isListening)
                         
                         Spacer()
                         
+                        // Enhanced recording button
                         Button(action: {
                             if viewModel.isListening {
                                 viewModel.stopRecording()
@@ -233,41 +264,86 @@ struct ConversationalInterviewView: View {
                                 viewModel.startRecording()
                             }
                         }) {
-                            Image(systemName: viewModel.isListening ? "stop.circle.fill" : "mic.circle.fill")
-                                .font(.system(size: 64))
-                                .foregroundColor(viewModel.isListening ? .red : .green)
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: viewModel.isListening ?
+                                                [Color.red, Color.red.opacity(0.8)] :
+                                                [AppTheme.primary, AppTheme.secondary],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 70, height: 70)
+                                    .shadow(color: viewModel.isListening ?
+                                        Color.red.opacity(0.3) :
+                                        AppTheme.primary.opacity(0.3),
+                                           radius: 8)
+                                
+                                Image(systemName: viewModel.isListening ?
+                                    "stop.fill" : "mic.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.white)
+                            }
                         }
                         .disabled(viewModel.isAISpeaking)
                     }
                     .padding()
                     
-                    // Show transcribed text
+                    // Enhanced submit button
                     if !viewModel.transcribedText.isEmpty {
                         Text(viewModel.transcribedText)
                             .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.gray.opacity(0.1))
+                            )
+                            .padding(.horizontal)
                         
-                        Button("Submit Response") {
-                            viewModel.stopRecording()
+                        Button(action: {
+                            withAnimation {
+                                viewModel.stopRecording()
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Submit Response")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    colors: viewModel.isListening ?
+                                        [AppTheme.successGreen, AppTheme.successGreen.opacity(0.8)] :
+                                        [Color.gray.opacity(0.3)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
+                            .shadow(color: viewModel.isListening ?
+                                AppTheme.successGreen.opacity(0.3) : .clear,
+                                   radius: 5)
                         }
                         .disabled(!viewModel.isListening)
-                        .padding()
+                        .padding(.horizontal)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing)
-                        .combined(with: .opacity)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8)),
-                    removal: .move(edge: .leading)
-                        .combined(with: .opacity)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8))
-                ))
             }
             
             Spacer()
         }
         .padding(.vertical)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isAISpeaking)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isListening)
+    }
+    
+    private var shouldShowRecordingControls: Bool {
+        return !viewModel.isListening || viewModel.transcribedText.isEmpty
     }
     
     private var analysisView: some View {

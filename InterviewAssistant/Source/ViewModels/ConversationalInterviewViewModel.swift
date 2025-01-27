@@ -26,7 +26,8 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     @Published var showError = false
     @Published var errorMessage = ""
     @Published private var interviewState: InterviewState = .ready
-    @Published var shouldAutoStartSpeech = false
+    @Published var shouldAutoStartSpeech = true
+    
     
     // MARK: - Private Properties
     private let speechRecognizer: SFSpeechRecognizer?
