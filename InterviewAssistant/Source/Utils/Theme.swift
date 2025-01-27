@@ -9,6 +9,11 @@ struct AppTheme {
     static let background = Color(hex: "#F7F7F7")
     static let surface = Color(hex: "#FFFFFF")
     static let text = Color(hex: "#2D3436")
+    static let gradientStart = Color(hex: "#4A90E2")
+    static let gradientEnd = Color(hex: "#7B68EE")
+    static let accentPurple = Color(hex: "#9B59B6")
+    static let successGreen = Color(hex: "#2ECC71")
+    static let warningOrange = Color(hex: "#E67E22")
     
     // Gradients
     static let gradient = LinearGradient(

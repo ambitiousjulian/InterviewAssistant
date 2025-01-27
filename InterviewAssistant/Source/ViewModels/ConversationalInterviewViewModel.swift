@@ -26,6 +26,7 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     @Published var showError = false
     @Published var errorMessage = ""
     @Published private var interviewState: InterviewState = .ready
+    @Published var shouldAutoStartSpeech = false
     
     // MARK: - Private Properties
     private let speechRecognizer: SFSpeechRecognizer?
@@ -42,6 +43,15 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         super.init()
         self.synthesizer.delegate = self
         setupSpeech()
+    }
+    
+    override func startInterview() {
+        super.startInterview() // This calls the parent class's implementation
+        if shouldAutoStartSpeech {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.speakCurrentQuestion()
+            }
+        }
     }
     
     // MARK: - Setup Methods
@@ -218,9 +228,12 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         
         super.submitResponse()
         
-        if let interview = interview,
-           interview.currentQuestionIndex < interview.questions.count {
-            speakCurrentQuestion()
+        if shouldAutoStartSpeech,
+           let interview = interview,
+           interview.currentQuestionIndex < interview.questions.count - 1 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.speakCurrentQuestion()
+            }
         }
     }
 }

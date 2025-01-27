@@ -12,7 +12,7 @@ import Speech
 
 struct ConversationalInterviewView: View {
     @StateObject private var viewModel = ConversationalInterviewViewModel()
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiAiss) private var dismiss
     @State private var isAnimating = false
     
     var body: some View {
@@ -255,6 +255,14 @@ struct ConversationalInterviewView: View {
                         .padding()
                     }
                 }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing)
+                        .combined(with: .opacity)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8)),
+                    removal: .move(edge: .leading)
+                        .combined(with: .opacity)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8))
+                ))
             }
             
             Spacer()
@@ -324,20 +332,26 @@ struct ConversationalInterviewView: View {
 }
 
 struct ModernButtonStyle: ButtonStyle {
+    var isEnabled: Bool = true
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding()
             .background(
                 LinearGradient(
-                    colors: [AppTheme.primary, AppTheme.secondary],
+                    colors: isEnabled ?
+                        [AppTheme.gradientStart, AppTheme.gradientEnd] :
+                        [Color.gray.opacity(0.3)],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             )
             .cornerRadius(12)
-            .shadow(radius: 5)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.spring(), value: configuration.isPressed)
+            .shadow(color: isEnabled ? AppTheme.gradientStart.opacity(0.3) : Color.clear,
+                    radius: 8, x: 0, y: 4)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6),
+                      value: configuration.isPressed)
     }
 }
 
@@ -349,9 +363,20 @@ struct PulsingRecordButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(isRecording ? Color.red : AppTheme.primary)
+                    .fill(
+                        LinearGradient(
+                            colors: isRecording ?
+                                [Color.red, Color.red.opacity(0.8)] :
+                                [AppTheme.gradientStart, AppTheme.gradientEnd],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 80, height: 80)
-                    .shadow(radius: 10)
+                    .shadow(color: isRecording ?
+                        Color.red.opacity(0.3) :
+                        AppTheme.gradientStart.opacity(0.3),
+                           radius: 10)
                 
                 if isRecording {
                     Circle()
@@ -371,5 +396,6 @@ struct PulsingRecordButton: View {
                     .foregroundColor(.white)
             }
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
