@@ -259,7 +259,14 @@ struct ConversationalInterviewView: View {
                         // Enhanced recording button
                         Button(action: {
                             if viewModel.isListening {
-                                viewModel.stopRecording()
+                                // If there's text, clear it instead of submitting
+                                if !viewModel.transcribedText.isEmpty {
+                                    withAnimation {
+                                        viewModel.clearRecording()
+                                    }
+                                } else {
+                                    viewModel.stopRecording()
+                                }
                             } else {
                                 viewModel.startRecording()
                             }

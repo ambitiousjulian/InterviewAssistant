@@ -210,6 +210,13 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         }
     }
     
+    func clearRecording() {
+        cleanupAudioSession()
+        isListening = false
+        transcribedText = ""
+        interviewState = .waitingForUserInput
+    }
+    
     func stopRecording() {
         cleanupAudioSession()
         isListening = false
