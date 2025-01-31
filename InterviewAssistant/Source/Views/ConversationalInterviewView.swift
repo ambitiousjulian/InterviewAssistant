@@ -20,7 +20,7 @@ struct ConversationalInterviewView: View {
     @State private var rotationAngle: Double = 0
     @StateObject private var audioMonitor = AudioLevelMonitor()
     @State private var audioLevels: [CGFloat] = Array(repeating: 0.0, count: 30)
-
+    @FocusState private var isResponseFocused: Bool
     
     var body: some View {
         ZStack {
@@ -66,6 +66,7 @@ struct ConversationalInterviewView: View {
         }
         .navigationTitle("Voice Interview")
         .navigationBarTitleDisplayMode(.inline)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if viewModel.currentState != .setup {
@@ -111,84 +112,106 @@ struct ConversationalInterviewView: View {
     }
     
     private var setupView: some View {
-        VStack(spacing: 25) {
-            Text("Voice Interview Setup")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(AppTheme.text)
-                .opacity(isAnimating ? 1 : 0)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Job Title", systemImage: "briefcase.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.purple)
-                
-                TextField("e.g. iOS Developer", text: $viewModel.jobTitle)
-                    .textFieldStyle(ModernTextFieldStyle())
-                    .autocapitalization(.words)
-            }
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Experience Level", systemImage: "chart.bar.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.purple)
-                
-                Picker("Experience Level", selection: $viewModel.experienceLevel) {
-                    ForEach(ExperienceLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level)
+        GeometryReader { geometry in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    Text("Voice Interview Setup")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(AppTheme.text)
+                        .opacity(isAnimating ? 1 : 0)
+                        .padding(.top, 20)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Job Title", systemImage: "briefcase.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.purple)
+                        
+                        TextField("e.g. iOS Developer", text: $viewModel.jobTitle)
+                            .textFieldStyle(ModernTextFieldStyle())
+                            .autocapitalization(.words)
+                            .focused($isResponseFocused)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                isResponseFocused = false
+                            }
                     }
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Experience Level", systemImage: "chart.bar.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.purple)
+                        
+                        Picker("Experience Level", selection: $viewModel.experienceLevel) {
+                            ForEach(ExperienceLevel.allCases, id: \.self) { level in
+                                Text(level.rawValue).tag(level)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                    
+                    Toggle(isOn: $viewModel.shouldAutoStartSpeech) {
+                        HStack {
+                            Image(systemName: "waveform.circle.fill")
+                            Text("Auto AI Speaking")
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.purple)
+                    }
+                    .padding(.horizontal)
+                    .tint(AppTheme.purple)
+                    
+                    Button(action: {
+                        isResponseFocused = false
+                        withAnimation(.spring()) {
+                            viewModel.startInterview()
+                        }
+                    }) {
+                        Text("Start Voice Interview")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: viewModel.canStartInterview ?
+                                        [AppTheme.purple, AppTheme.secondary] :
+                                        [Color.gray.opacity(0.3)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(15)
+                    }
+                    .disabled(!viewModel.canStartInterview)
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                    
+                    // Add spacing at the bottom to prevent keyboard overlap
+                    Spacer().frame(height: geometry.safeAreaInsets.bottom + 20)
                 }
-                .pickerStyle(.segmented)
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white)
+                        .shadow(color: AppTheme.shadowLight, radius: 20)
+                )
+                .padding()
+                .frame(minHeight: geometry.size.height)
             }
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
-            
-            // Add this before the Start Interview button
-            Toggle(isOn: $viewModel.shouldAutoStartSpeech) {
-                HStack {
-                    Image(systemName: "waveform.circle.fill")
-                    Text("Auto AI Speaking")
+            .simultaneousGesture(
+                DragGesture().onChanged { _ in
+                    isResponseFocused = false
                 }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(AppTheme.purple)
+            )
+            .onTapGesture {
+                isResponseFocused = false
             }
-            .padding(.horizontal)
-            .tint(AppTheme.purple)
-
-            
-            Button(action: {
-                withAnimation(.spring()) {
-                    viewModel.startInterview()
-                }
-            }) {
-                Text("Start Voice Interview")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: viewModel.canStartInterview ?
-                                [AppTheme.purple, AppTheme.secondary] :
-                                [Color.gray.opacity(0.3)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .cornerRadius(15)
-            }
-            .disabled(!viewModel.canStartInterview)
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white)
-                .shadow(color: AppTheme.shadowLight, radius: 20)
-        )
-        .padding()
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             withAnimation(.easeOut(duration: 0.8)) {
                 isAnimating = true
