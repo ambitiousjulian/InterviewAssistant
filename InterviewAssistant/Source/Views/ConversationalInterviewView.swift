@@ -14,6 +14,13 @@ struct ConversationalInterviewView: View {
     @StateObject private var viewModel = ConversationalInterviewViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var isAnimating = false
+    @State private var pulseAnimation = false
+    @State private var waveAnimation = false
+    @State private var isAnimatingBars = false
+    @State private var rotationAngle: Double = 0
+    @StateObject private var audioMonitor = AudioLevelMonitor()
+    @State private var audioLevels: [CGFloat] = Array(repeating: 0.0, count: 30)
+
     
     var body: some View {
         ZStack {
@@ -63,18 +70,23 @@ struct ConversationalInterviewView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if viewModel.currentState != .setup {
                     Button(action: {
+                        // First cleanup any ongoing activities
+                        viewModel.cleanup()
+                        // Then end the interview with animation
                         withAnimation(.spring()) {
                             viewModel.endInterview()
                         }
+                        // Optional: Dismiss the view
+                        dismiss()
                     }) {
                         Text("End Interview")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppTheme.primary)
+                            .foregroundColor(.red) // Changed to red to indicate destructive action
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(
                                 Capsule()
-                                    .fill(AppTheme.primary.opacity(0.1))
+                                    .fill(Color.red.opacity(0.1))
                             )
                     }
                 }
@@ -298,47 +310,69 @@ struct ConversationalInterviewView: View {
                     }
                     .padding()
                     
-                    // Enhanced submit button
-                    if !viewModel.transcribedText.isEmpty {
-                        Text(viewModel.transcribedText)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.1))
-                            )
-                            .padding(.horizontal)
-                        
-                        Button(action: {
-                            withAnimation {
-                                viewModel.stopRecording()
+                   
+                    // Then replace the recording visualization section in voiceInterviewView with:
+                    if viewModel.isListening && !viewModel.isAISpeaking {
+                        VStack(spacing: 12) {
+                            // Status indicator
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 6, height: 6)
+                                    .opacity(audioMonitor.audioLevel > 0.1 ? 1 : 0.5)
+                                    .scaleEffect(audioMonitor.audioLevel > 0.1 ? 1.2 : 1)
+                                    .animation(.easeInOut(duration: 0.2), value: audioMonitor.audioLevel > 0.1)
+                                
+                                Text(audioMonitor.audioLevel > 0.1 ? "Listening" : "Waiting...")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.gray)
                             }
-                        }) {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Submit Response")
-                                    .fontWeight(.semibold)
+                            .padding(.top, 5)
+                            
+                            // Wave animation
+                            AudioWaveView(audioLevel: CGFloat(audioMonitor.audioLevel))
+                                .frame(height: 50)
+                                .padding(.horizontal, 30)
+                            
+                            // Submit Button
+                            if audioMonitor.audioLevel > 0.1 {
+                                Button(action: {
+                                    withAnimation {
+                                        viewModel.stopRecording()
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 16))
+                                        Text("Submit")
+                                            .font(.system(size: 16, weight: .medium))
+                                    }
+                                    .frame(width: 110)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color.blue.opacity(0.9), Color.purple.opacity(0.9)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .foregroundColor(.white)
+                                    .cornerRadius(20)
+                                    .shadow(color: Color.blue.opacity(0.15), radius: 4, y: 2)
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .padding(.top, 5)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                LinearGradient(
-                                    colors: viewModel.isListening ?
-                                        [AppTheme.successGreen, AppTheme.successGreen.opacity(0.8)] :
-                                        [Color.gray.opacity(0.3)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .foregroundColor(.white)
-                            .cornerRadius(15)
-                            .shadow(color: viewModel.isListening ?
-                                AppTheme.successGreen.opacity(0.3) : .clear,
-                                   radius: 5)
                         }
-                        .disabled(!viewModel.isListening)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .onAppear {
+                            audioMonitor.startMonitoring()
+                        }
+                        .onDisappear {
+                            audioMonitor.stopMonitoring()
+                        }
+                        .transition(.opacity)
                     }
+
                 }
             }
             

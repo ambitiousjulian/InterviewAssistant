@@ -27,6 +27,7 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     @Published var errorMessage = ""
     @Published private var interviewState: InterviewState = .ready
     @Published var shouldAutoStartSpeech = true
+    @Published var isInAnalysisMode = false
     
     
     // MARK: - Private Properties
@@ -36,6 +37,10 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     private let audioEngine = AVAudioEngine()
     private let synthesizer: AVSpeechSynthesizer
     private var isAutoFlowEnabled = true
+    private var isLastQuestion: Bool {
+        guard let interview = interview else { return false }
+        return interview.currentQuestionIndex >= interview.questions.count - 1
+    }
     
     // MARK: - Initialization
     override init() {
@@ -93,8 +98,22 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     
     // MARK: - Audio Session Management
     private func setupAudioSession() throws {
-        try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
-        try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.playAndRecord,
+                                      mode: .spokenAudio,
+                                      options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        
+        // Set preferred buffer duration and sample rate
+        try audioSession.setPreferredIOBufferDuration(0.005)
+        try audioSession.setPreferredSampleRate(44100.0)
+        
+        // Check and set input gain if supported
+        if audioSession.isInputGainSettable {
+            try audioSession.setInputGain(1.0) // Maximum gain
+        } else {
+            print("Input gain adjustment is not supported on this device.")
+        }
     }
     
     private func cleanupAudioSession() {
@@ -126,33 +145,87 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     }
     
     func moveToNextQuestion() {
-        guard var interview = interview else { return }
+        print("\n=== MOVING TO NEXT QUESTION ===")
+        
+        guard var interview = interview else {
+            print("No interview object available")
+            return
+        }
+        
+        guard !isInAnalysisMode else {
+            print("In analysis mode, cannot move to next question")
+            return
+        }
+        
+        print("Current state:")
+        print("- Current index: \(interview.currentQuestionIndex)")
+        print("- Total questions: \(interview.questions.count)")
         
         cleanupAudioSession()
         
         if interview.currentQuestionIndex < interview.questions.count - 1 {
             interview.currentQuestionIndex += 1
+            print("Advanced to next question:")
+            print("- New index: \(interview.currentQuestionIndex)")
+            
+            self.interview = interview
             interviewState = .ready
-            speakCurrentQuestion()
+            
+            if shouldAutoStartSpeech {
+                print("Scheduling speech with 0.5s delay")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self else {
+                        print("Self not available in async block")
+                        return
+                    }
+                    
+                    guard !self.isInAnalysisMode else {
+                        print("Entered analysis mode during delay")
+                        return
+                    }
+                    
+                    print("Starting speech for question \(interview.currentQuestionIndex + 1)")
+                    self.speakCurrentQuestion()
+                }
+            } else {
+                print("Auto-speech disabled")
+            }
         } else {
+            print("Reached last question, ending interview")
             endInterview()
         }
+        print("=== MOVE TO NEXT QUESTION COMPLETE ===\n")
     }
+
 
     // MARK: - Speech Methods
     func speakCurrentQuestion() {
-        guard let interview = interview else { return }
+        print("\n=== SPEAKING CURRENT QUESTION ===")
+        guard let interview = interview,
+              interview.currentQuestionIndex < interview.questions.count else {
+            print("ERROR: Invalid question index")
+            return
+        }
         
-        cleanupAudioSession()
-        interviewState = .aiSpeaking
+        cleanup() // Clean up previous audio session
         isAISpeaking = true
         
-        let utterance = AVSpeechUtterance(string: interview.questions[interview.currentQuestionIndex].text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = 0.5
-        utterance.pitchMultiplier = 1.0
-        synthesizer.speak(utterance)
+        do {
+            try setupAudioSession()
+            let questionText = interview.questions[interview.currentQuestionIndex].text
+            let utterance = AVSpeechUtterance(string: questionText)
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            utterance.rate = 0.8
+            utterance.pitchMultiplier = 1.0
+            utterance.volume = 1.0
+            
+            synthesizer.speak(utterance)
+        } catch {
+            print("Failed to setup audio session: \(error)")
+            isAISpeaking = false
+        }
     }
+
     
     // MARK: - Recording Methods
     func toggleRecording() {
@@ -165,21 +238,27 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
     
     func startRecording() {
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
-            showError = true
-            errorMessage = "Speech recognition is not available"
-            return
-        }
-        
-        do {
-            cleanupAudioSession()
-            try setupAudioSession()
+                showError = true
+                errorMessage = "Speech recognition is not available"
+                return
+            }
             
-            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-            guard let recognitionRequest = recognitionRequest else { return }
-            
-            recognitionRequest.shouldReportPartialResults = true
-            
-            let inputNode = audioEngine.inputNode
+            do {
+                cleanupAudioSession()
+                
+                // Configure audio session specifically for recording
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playAndRecord,
+                                           mode: .measurement,
+                                           options: [.defaultToSpeaker, .allowBluetooth])
+                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                
+                recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+                guard let recognitionRequest = recognitionRequest else { return }
+                
+                recognitionRequest.shouldReportPartialResults = true
+                
+                let inputNode = audioEngine.inputNode
             
             recognitionTask = recognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 guard let self = self else { return }
@@ -217,6 +296,31 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         interviewState = .waitingForUserInput
     }
     
+    // Add this cleanup method
+    func cleanup() {
+        cleanupAudioSession()
+        synthesizer.stopSpeaking(at: .immediate)
+        isListening = false
+        isAISpeaking = false
+        transcribedText = ""
+        audioEngine.stop()
+    }
+    
+    override func endInterview() {
+        // First cleanup all audio-related activities
+        cleanup()
+        
+        // Reset all states
+        isListening = false
+        isAISpeaking = false
+        transcribedText = ""
+        isInAnalysisMode = false
+        
+        // Call super to handle any parent class cleanup
+        super.endInterview()
+    }
+
+    
     func stopRecording() {
         cleanupAudioSession()
         isListening = false
@@ -229,31 +333,87 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         }
     }
     
-    // MARK: - Response Handling
+    // Update startNewInterview to reset the analysis mode
+    override func startNewInterview() {
+        isInAnalysisMode = false
+        cleanup()
+        super.startNewInterview()
+    }
+    
+    // Update submitResponse to check if we're in analysis mode
     override func submitResponse() {
-        currentResponse = transcribedText
-        transcribedText = ""
+        print("\n=== SUBMITTING RESPONSE ===")
         
-        super.submitResponse()
+        if isInAnalysisMode {
+            print("In analysis mode, skipping response submission")
+            return
+        }
         
-        if shouldAutoStartSpeech,
-           let interview = interview,
-           interview.currentQuestionIndex < interview.questions.count - 1 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                self?.speakCurrentQuestion()
+        guard var interview = self.interview else {
+            print("No interview object available")
+            return
+        }
+        
+        let trimmedResponse = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedResponse.isEmpty {
+            print("Empty response, skipping submission")
+            return
+        }
+        
+        // Save response
+        if interview.currentQuestionIndex < interview.responses.count {
+            interview.responses[interview.currentQuestionIndex] = trimmedResponse
+        } else {
+            interview.responses.append(trimmedResponse)
+        }
+        
+        self.interview = interview
+        transcribedText = "" // Clear transcribed text
+        
+        print("Current question index: \(interview.currentQuestionIndex)")
+        print("Total questions: \(interview.questions.count)")
+        
+        if interview.currentQuestionIndex >= interview.questions.count - 1 {
+            print("Final question completed, proceeding to analysis")
+            cleanup()
+            
+            // Important: Update the state before starting analysis
+            DispatchQueue.main.async {
+                self.currentState = .reviewing // Set the state to reviewing
+                self.isInAnalysisMode = true
+                
+                // Start analysis after a short delay to ensure state updates are processed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    super.analyzeInterview() // Call the parent class's analysis method
+                }
+            }
+        } else {
+            interview.currentQuestionIndex += 1
+            self.interview = interview
+            
+            if shouldAutoStartSpeech {
+                cleanup() // Ensure clean state before next question
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.speakCurrentQuestion()
+                }
             }
         }
     }
 }
 
-// MARK: - AVSpeechSynthesizerDelegate
 extension ConversationalInterviewViewModel: AVSpeechSynthesizerDelegate {
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let interview = self.interview else { return }
+            
             self.isAISpeaking = false
-            self.interviewState = .waitingForUserInput
-            if self.isAutoFlowEnabled {
-                self.startRecording()
+            
+            // Always start recording after speech, even for the last question
+            if self.shouldAutoStartSpeech && !self.isInAnalysisMode {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.startRecording()
+                }
             }
         }
     }

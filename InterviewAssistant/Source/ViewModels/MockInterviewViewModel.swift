@@ -231,7 +231,7 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
             )
         }
     }
-    private func analyzeInterview() {
+    func analyzeInterview() {
         print("\n=== STARTING INTERVIEW ANALYSIS ===")
         
         guard let interview = interview else {
