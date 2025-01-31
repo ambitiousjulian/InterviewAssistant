@@ -58,6 +58,7 @@ struct MockInterviewView: View {
             }
         .navigationTitle("Mock Interview")
         .navigationBarTitleDisplayMode(.inline)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if viewModel.currentState != .setup {
@@ -78,14 +79,6 @@ struct MockInterviewView: View {
                     }
                 }
             }
-            
-            ToolbarItem(placement: .keyboard) {
-                if isResponseFocused {
-                    Button("Done") {
-                        isResponseFocused = false
-                    }
-                }
-            }
         }
     }
    
@@ -101,134 +94,178 @@ struct MockInterviewView: View {
         }
     
     private var setupView: some View {
-        VStack(spacing: 25) {
-            Text("Setup Mock Interview")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(AppTheme.text)
-                .opacity(isAnimating ? 1 : 0)
-            
-            // Job Title Input with modern styling
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Job Title", systemImage: "briefcase.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.purple)
-                
-                TextField("e.g. iOS Developer", text: $viewModel.jobTitle)
-                    .textFieldStyle(ModernTextFieldStyle())
-                    .autocapitalization(.words)
-            }
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
-            
-            // Experience Level Picker with modern styling
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Experience Level", systemImage: "chart.bar.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.purple)
-                
-                Picker("Experience Level", selection: $viewModel.experienceLevel) {
-                    ForEach(ExperienceLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level)
+        ScrollViewReader { scrollProxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    Text("Setup Mock Interview")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(AppTheme.text)
+                        .opacity(isAnimating ? 1 : 0)
+                        .id("title")
+                    
+                    // Job Title Input with modern styling
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Job Title", systemImage: "briefcase.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.purple)
+                        
+                        TextField("e.g. iOS Developer", text: $viewModel.jobTitle)
+                            .textFieldStyle(ModernTextFieldStyle())
+                            .autocapitalization(.words)
+                            .focused($isResponseFocused)
+                            .onChange(of: isResponseFocused) { focused in
+                                if focused {
+                                    withAnimation {
+                                        scrollProxy.scrollTo("jobTitle", anchor: .center)
+                                    }
+                                }
+                            }
+                            .submitLabel(.done)
+                            .id("jobTitle")
                     }
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
-                        .shadow(color: AppTheme.shadowLight, radius: 10)
-                )
-            }
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
-            
-            // Modern Start Button
-            Button(action: {
-                withAnimation(.spring()) {
-                    viewModel.startInterview()
-                }
-            }) {
-                Text("Start Interview")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: viewModel.canStartInterview ?
-                                [AppTheme.purple, AppTheme.secondary] :
-                                [Color.gray.opacity(0.3)],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                    
+                    // Experience Level Picker with modern styling
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Experience Level", systemImage: "chart.bar.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.purple)
+                        
+                        Picker("Experience Level", selection: $viewModel.experienceLevel) {
+                            ForEach(ExperienceLevel.allCases, id: \.self) { level in
+                                Text(level.rawValue).tag(level)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white)
+                                .shadow(color: AppTheme.shadowLight, radius: 10)
                         )
-                    )
-                    .cornerRadius(15)
-                    .shadow(
-                        color: viewModel.canStartInterview ?
-                            AppTheme.purple.opacity(0.3) : Color.clear,
-                        radius: 10, y: 5
-                    )
+                    }
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                    
+                    // Modern Start Button
+                    Button(action: {
+                        isResponseFocused = false // Dismiss keyboard before starting
+                        withAnimation(.spring()) {
+                            viewModel.startInterview()
+                        }
+                    }) {
+                        Text("Start Interview")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: viewModel.canStartInterview ?
+                                        [AppTheme.purple, AppTheme.secondary] :
+                                        [Color.gray.opacity(0.3)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(15)
+                            .shadow(
+                                color: viewModel.canStartInterview ?
+                                    AppTheme.purple.opacity(0.3) : Color.clear,
+                                radius: 10, y: 5
+                            )
+                    }
+                    .disabled(!viewModel.canStartInterview)
+                    .offset(y: isAnimating ? 0 : 20)
+                    .opacity(isAnimating ? 1 : 0)
+                }
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white)
+                        .shadow(color: AppTheme.shadowLight, radius: 20)
+                )
+                .padding()
             }
-            .disabled(!viewModel.canStartInterview)
-            .offset(y: isAnimating ? 0 : 20)
-            .opacity(isAnimating ? 1 : 0)
+            .simultaneousGesture(
+                DragGesture().onChanged { _ in
+                    isResponseFocused = false
+                }
+            )
+            .onTapGesture {
+                isResponseFocused = false
+            }
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white)
-                .shadow(color: AppTheme.shadowLight, radius: 20)
-        )
-        .padding()
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             withAnimation(.easeOut(duration: 0.8)) {
                 isAnimating = true
             }
         }
     }
-    
     private var interviewView: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Modern Progress and Counter
-                VStack(spacing: 8) {
-                    ProgressView(value: Double(viewModel.interview?.currentQuestionIndex ?? 0),
-                               total: Double(viewModel.interview?.questions.count ?? 1))
-                        .progressViewStyle(ModernProgressViewStyle())
-                    
-                    if let interview = viewModel.interview {
-                        Text("Question \(interview.currentQuestionIndex + 1) of \(interview.questions.count)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.text.opacity(0.6))
-                    }
-                }
-                .padding(.horizontal)
-                
-                if let interview = viewModel.interview {
-                    QuestionCard(question: interview.questions[interview.currentQuestionIndex])
-                        .padding(.horizontal)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Your Response", systemImage: "text.bubble.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppTheme.purple)
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Progress and Counter
+                    VStack(spacing: 8) {
+                        ProgressView(value: Double(viewModel.interview?.currentQuestionIndex ?? 0),
+                                   total: Double(viewModel.interview?.questions.count ?? 1))
+                            .progressViewStyle(ModernProgressViewStyle())
                         
-                        ResponseInput(text: $viewModel.currentResponse, isFocused: _isResponseFocused)
+                        if let interview = viewModel.interview {
+                            Text("Question \(interview.currentQuestionIndex + 1) of \(interview.questions.count)")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(AppTheme.text.opacity(0.6))
+                        }
                     }
                     .padding(.horizontal)
+                    .id("top")
                     
-                    SubmitButton(action: {
-                        isResponseFocused = false
-                        withAnimation {
-                            viewModel.submitResponse()
+                    if let interview = viewModel.interview {
+                        QuestionCard(question: interview.questions[interview.currentQuestionIndex])
+                            .padding(.horizontal)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Your Response", systemImage: "text.bubble.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(AppTheme.purple)
+                            
+                            ResponseInput(
+                                text: $viewModel.currentResponse,
+                                isFocused: _isResponseFocused,
+                                onFocusChange: { focused in
+                                    if focused {
+                                        withAnimation {
+                                            scrollProxy.scrollTo("response", anchor: .center)
+                                        }
+                                    }
+                                }
+                            )
+                            .id("response")
                         }
-                    }, isEnabled: !viewModel.currentResponse.isEmpty)
-                    .padding(.top)
+                        .padding(.horizontal)
+                        
+                        SubmitButton(action: {
+                            isResponseFocused = false
+                            withAnimation {
+                                viewModel.submitResponse()
+                                scrollProxy.scrollTo("top", anchor: .top)
+                            }
+                        }, isEnabled: !viewModel.currentResponse.isEmpty)
+                        .padding(.top)
+                    }
                 }
+                .padding(.vertical)
             }
-            .padding(.vertical)
+            .background(Color.white.opacity(0.5))
+            .simultaneousGesture(
+                DragGesture().onChanged { _ in
+                    isResponseFocused = false
+                }
+            )
         }
-        .background(Color.white.opacity(0.5))
     }
     
     private var analysisView: some View {
@@ -371,10 +408,14 @@ struct QuestionCard: View {
 struct ResponseInput: View {
     @Binding var text: String
     @FocusState var isFocused: Bool
+    var onFocusChange: (Bool) -> Void
     
     var body: some View {
         TextEditor(text: $text)
             .focused($isFocused)
+            .onChange(of: isFocused) { newValue in
+                onFocusChange(newValue)
+            }
             .frame(height: 150)
             .padding()
             .background(Color.white)
