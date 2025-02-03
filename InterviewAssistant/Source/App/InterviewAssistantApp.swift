@@ -21,13 +21,16 @@ struct InterviewAssistantApp: App {
                     if authViewModel.showOnboarding {
                         OnboardingView()
                             .environmentObject(authViewModel)
+                            .navigationViewStyle(StackNavigationViewStyle())
                     } else {
                         MainTabView(selectedTab: authViewModel.isFirstTimeUser ? 2 : 0)
                             .environmentObject(authViewModel)
+                            .navigationViewStyle(StackNavigationViewStyle())
                     }
                 } else {
                     LoginView()
                         .environmentObject(authViewModel)
+                        .navigationViewStyle(StackNavigationViewStyle())
                 }
             }
             .preferredColorScheme(.light)
