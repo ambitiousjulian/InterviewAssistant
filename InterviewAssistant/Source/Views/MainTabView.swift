@@ -27,6 +27,11 @@ struct MainTabView: View {
                     Label("Profile", systemImage: "person.circle.fill")
                 }
                 .tag(2)
+            FeedbackView()
+                .tabItem {
+                    Label("Feedback", systemImage: "message.fill")
+                }
+                .tag(3)
         }
         .tint(AppTheme.primary)
     }
