@@ -215,7 +215,7 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
             let questionText = interview.questions[interview.currentQuestionIndex].text
             let utterance = AVSpeechUtterance(string: questionText)
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.8
+            utterance.rate = 0.56
             utterance.pitchMultiplier = 1.0
             utterance.volume = 1.0
             

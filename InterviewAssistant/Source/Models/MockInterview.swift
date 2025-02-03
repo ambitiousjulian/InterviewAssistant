@@ -10,10 +10,10 @@ import Foundation
 // Interview Models
 // In MockInterview.swift
 enum ExperienceLevel: String, CaseIterable {
-    case entry = "Entry Level"
-    case mid = "Mid Level"
-    case senior = "Senior Level"
-    case lead = "Lead/Manager"
+    case entry = "Entry"
+    case mid = "Mid"
+    case senior = "Senior"
+    case lead = "Lead"
 }
 
 struct MockInterview: Identifiable {

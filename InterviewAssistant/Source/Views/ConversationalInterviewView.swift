@@ -143,12 +143,33 @@ struct ConversationalInterviewView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppTheme.purple)
                         
-                        Picker("Experience Level", selection: $viewModel.experienceLevel) {
+                        HStack(spacing: 0) {
                             ForEach(ExperienceLevel.allCases, id: \.self) { level in
-                                Text(level.rawValue).tag(level)
+                                Button(action: {
+                                    viewModel.experienceLevel = level
+                                }) {
+                                    Text(level.rawValue)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(
+                                            viewModel.experienceLevel == level ? .white : AppTheme.text
+                                        )
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            viewModel.experienceLevel == level ?
+                                                AppTheme.primary :
+                                                Color.clear
+                                        )
+                                        .cornerRadius(8)
+                                }
                             }
                         }
-                        .pickerStyle(.segmented)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+                        )
+                        .cornerRadius(12)
+                        .shadow(color: AppTheme.shadowLight, radius: 5)
                     }
                     .offset(y: isAnimating ? 0 : 20)
                     .opacity(isAnimating ? 1 : 0)

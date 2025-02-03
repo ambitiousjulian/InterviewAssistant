@@ -3,10 +3,7 @@ import SwiftUI
 struct ResumeInputView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var selectedInputMethod = 0
-    @State private var showingDocumentPicker = false
     @State private var isAnimating = false
-    @State private var loadingProgress = 0.0
     
     var body: some View {
         NavigationView {
@@ -22,10 +19,7 @@ struct ResumeInputView: View {
                         headerSection
                             .offset(y: isAnimating ? 0 : -30)
                         
-                        // Input Method Selector
-                        inputMethodSelector
-                        
-                        // Analyze Button (Moved to top)
+                        // Analyze Button
                         analyzeButton
                             .padding(.horizontal)
                         
@@ -36,9 +30,7 @@ struct ResumeInputView: View {
                         }
                         
                         // Clipboard Button
-                        if selectedInputMethod == 0 {
-                            pasteClipboardButton
-                        }
+                        pasteClipboardButton
                         
                         // Main Input Section
                         inputSection
@@ -90,7 +82,7 @@ struct ResumeInputView: View {
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("We'll analyze your resume to enhance your interview preparation")
+            Text("Paste your resume text below for analysis")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -98,62 +90,23 @@ struct ResumeInputView: View {
         }
     }
     
-    private var inputMethodSelector: some View {
-        Picker("Input Method", selection: $selectedInputMethod) {
-            Text("Paste Text").tag(0)
-            Text("Upload File").tag(1)
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
-    }
-    
     private var inputSection: some View {
-        Group {
-            if selectedInputMethod == 0 {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Resume Text")
-                        .font(.headline)
-                        .foregroundColor(AppTheme.text)
-                    
-                    TextEditor(text: $viewModel.resumeText)
-                        .frame(minHeight: 200)
-                        .padding()
-                        .background(AppTheme.surface)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
-                        )
-                }
-            } else {
-                fileUploadSection
-            }
-        }
-        .padding(.vertical)
-    }
-    
-    private var fileUploadSection: some View {
-        VStack {
-            Button {
-                showingDocumentPicker = true
-            } label: {
-                VStack(spacing: 15) {
-                    Image(systemName: "arrow.up.doc")
-                        .font(.system(size: 30))
-                    Text("Upload PDF or Word Document")
-                }
-                .frame(maxWidth: .infinity)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Resume Text")
+                .font(.headline)
+                .foregroundColor(AppTheme.text)
+            
+            TextEditor(text: $viewModel.resumeText)
+                .frame(minHeight: 200)
                 .padding()
                 .background(AppTheme.surface)
-                .cornerRadius(15)
-                .shadow(color: AppTheme.shadowLight, radius: 5)
-            }
-            .foregroundColor(AppTheme.primary)
-            
-            Text("Supported formats: PDF, DOC, DOCX")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppTheme.primary.opacity(0.2), lineWidth: 1)
+                )
         }
+        .padding(.vertical)
     }
     
     private var pasteClipboardButton: some View {
