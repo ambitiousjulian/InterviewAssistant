@@ -27,8 +27,16 @@ struct MainTabView: View {
                     Label("Profile", systemImage: "person.circle.fill")
                 }
                 .tag(2)
+            
+            FeedbackView()
+                .tabItem {
+                    Label("Feedback", systemImage: "message.fill")
+                }
+                .tag(3)
         }
         .tint(AppTheme.primary)
+        // Key modifications for iPad compatibility
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
@@ -96,6 +104,7 @@ struct InterviewOptionsView: View {
                     .padding(.horizontal)
                 }
             }
+            .navigationViewStyle(StackNavigationViewStyle())
             .navigationBarHidden(true)
             .onAppear {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
