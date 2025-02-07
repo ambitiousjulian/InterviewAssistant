@@ -17,18 +17,12 @@ struct InterviewAssistantApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if authViewModel.isAuthenticated {
-                    if authViewModel.showOnboarding {
-                        OnboardingView()
-                            .environmentObject(authViewModel)
-                            .navigationViewStyle(StackNavigationViewStyle())
-                    } else {
-                        MainTabView(selectedTab: authViewModel.isFirstTimeUser ? 2 : 0)
-                            .environmentObject(authViewModel)
-                            .navigationViewStyle(StackNavigationViewStyle())
-                    }
+                if authViewModel.showOnboarding && authViewModel.isAuthenticated {
+                    OnboardingView()
+                        .environmentObject(authViewModel)
+                        .navigationViewStyle(StackNavigationViewStyle())
                 } else {
-                    LoginView()
+                    MainTabView(selectedTab: authViewModel.isFirstTimeUser && authViewModel.isAuthenticated ? 2 : 0)
                         .environmentObject(authViewModel)
                         .navigationViewStyle(StackNavigationViewStyle())
                 }

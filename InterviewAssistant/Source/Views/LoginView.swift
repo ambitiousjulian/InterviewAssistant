@@ -261,6 +261,7 @@ struct LoadingView: View {
     }
 }
 
+
 // Preview Provider
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
