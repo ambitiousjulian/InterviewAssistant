@@ -199,24 +199,26 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
 
 
     // MARK: - Speech Methods
+    // MARK: - Speech Methods
     func speakCurrentQuestion() {
-        print("\n=== SPEAKING CURRENT QUESTION ===")
         guard let interview = interview,
               interview.currentQuestionIndex < interview.questions.count else {
             print("ERROR: Invalid question index")
             return
         }
         
-        cleanup() // Clean up previous audio session
+        cleanup()
         isAISpeaking = true
         
         do {
             try setupAudioSession()
             let questionText = interview.questions[interview.currentQuestionIndex].text
             let utterance = AVSpeechUtterance(string: questionText)
-            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.56
-            utterance.pitchMultiplier = 1.0
+            
+            utterance.voice = findMaleVoice()
+            
+            utterance.rate = 0.54
+            utterance.pitchMultiplier = 0.95
             utterance.volume = 1.0
             
             synthesizer.speak(utterance)
@@ -226,6 +228,22 @@ class ConversationalInterviewViewModel: MockInterviewViewModel {
         }
     }
 
+    private func findMaleVoice() -> AVSpeechSynthesisVoice? {
+        let maleVoiceIdentifiers = [
+            "com.apple.ttsbundle.Alex-compact",
+            "com.apple.ttsbundle.Daniel-compact",
+            "com.apple.voice.compact.en-US.Alex"
+        ]
+        
+        for identifier in maleVoiceIdentifiers {
+            if let voice = AVSpeechSynthesisVoice(identifier: identifier) {
+                return voice
+            }
+        }
+        
+        return AVSpeechSynthesisVoice.speechVoices()
+            .first { $0.language.hasPrefix("en-") }
+    }
     
     // MARK: - Recording Methods
     func toggleRecording() {

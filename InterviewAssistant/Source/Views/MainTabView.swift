@@ -3,6 +3,7 @@ import FirebaseAuth
 
 struct MainTabView: View {
     @State var selectedTab: Int
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     init(selectedTab: Int = 0) {
         _selectedTab = State(initialValue: selectedTab)
@@ -22,11 +23,24 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.circle.fill")
+            Group {
+                if authViewModel.isAuthenticated {
+                    if authViewModel.showOnboarding {
+                        OnboardingView()
+                            .environmentObject(authViewModel)
+                    } else {
+                        ProfileView()
+                            .environmentObject(authViewModel)
+                    }
+                } else {
+                    ProfileView() // This will show the CTA when not authenticated
+                        .environmentObject(authViewModel)
                 }
-                .tag(2)
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.circle.fill")
+            }
+            .tag(2)
             
             FeedbackView()
                 .tabItem {
@@ -35,7 +49,6 @@ struct MainTabView: View {
                 .tag(3)
         }
         .tint(AppTheme.primary)
-        // Key modifications for iPad compatibility
         .navigationViewStyle(StackNavigationViewStyle())
     }
 }
@@ -75,7 +88,7 @@ struct InterviewOptionsView: View {
                 }
                 
                 VStack(spacing: 30) {
-                    Text("Choose Your\nInterview Style")
+                    Text("Choose Your\nMock-Interview\nStyle")
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(AppTheme.text)
                         .multilineTextAlignment(.center)
