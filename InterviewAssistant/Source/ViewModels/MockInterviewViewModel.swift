@@ -24,6 +24,8 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     @Published var currentGeneratedContent: String = ""
     @Published var experienceLevel: ExperienceLevel = .entry
     @Published var showingEndInterviewAlert = false
+    @Published var showSubscriptionView = false
+        private let subscriptionManager = SubscriptionManager.shared
     private var isResetting = false
 
     // MARK: - Private Properties
@@ -96,6 +98,13 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     
     // MARK: - Interview Methods
     func startInterview() {
+        if !subscriptionManager.canUseInterview() {
+            showSubscriptionView = true
+            return
+        }
+        
+        subscriptionManager.useInterview()
+        
         print("Start Interview button clicked")
             
         // Prevent starting new interview while resetting

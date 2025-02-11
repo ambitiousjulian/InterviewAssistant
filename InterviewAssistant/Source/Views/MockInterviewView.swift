@@ -80,6 +80,9 @@ struct MockInterviewView: View {
                 }
             }
         }
+        .sheet(isPresented: $viewModel.showSubscriptionView) {
+            SubscriptionView()
+        }
     }
    
     private var loadingMessage: String {
