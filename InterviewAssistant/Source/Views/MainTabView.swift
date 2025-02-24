@@ -12,12 +12,14 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             LiveHelperView()
+                .environmentObject(authViewModel)
                 .tabItem {
                     Label("Live Help", systemImage: "waveform.circle.fill")
                 }
                 .tag(0)
             
             InterviewOptionsView()
+                .environmentObject(authViewModel)
                 .tabItem {
                     Label("Practice", systemImage: "person.2.fill")
                 }

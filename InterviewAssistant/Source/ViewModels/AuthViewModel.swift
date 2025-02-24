@@ -3,43 +3,75 @@ import FirebaseAuth
 
 class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
-    @Published var isAuthenticated = false
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var showOnboarding = false
-    @Published var isFirstTimeUser = false
-    
-    private var handler: AuthStateDidChangeListenerHandle?
-    
-    init() {
-        setupAuthStateListener()
-    }
-    
-    private func setupAuthStateListener() {
-        handler = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
-            Task { @MainActor in
-                if let firebaseUser = firebaseUser {
-                    do {
-                        let user = try await FirebaseManager.shared.fetchUserProfile(uid: firebaseUser.uid)
-                        self?.currentUser = user
-                        self?.isAuthenticated = true
-                        
-                        // Check if user has completed onboarding
-                        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding_\(user.id)")
-                        self?.showOnboarding = !hasCompletedOnboarding
-                        self?.isFirstTimeUser = !hasCompletedOnboarding
-                        
-                    } catch {
-                        print("[ERROR] Failed to fetch user profile: \(error)")
-                        self?.error = error.localizedDescription
+       @Published var isAuthenticated = false
+       @Published var isLoading = false
+       @Published var error: String?
+       @Published var showOnboarding = false
+       @Published var isFirstTimeUser = false
+       
+       private var handler: AuthStateDidChangeListenerHandle?
+       
+       init() {
+           setupAuthStateListener()
+       }
+       
+       private func setupAuthStateListener() {
+           handler = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
+               Task { @MainActor in
+                   if let firebaseUser = firebaseUser {
+                       do {
+                           let user = try await FirebaseManager.shared.fetchUserProfile(uid: firebaseUser.uid)
+                           self?.currentUser = user
+                           self?.isAuthenticated = true
+                           
+                           // Check if user has completed onboarding
+                           let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding_\(user.id)")
+                           self?.showOnboarding = !hasCompletedOnboarding
+                           self?.isFirstTimeUser = !hasCompletedOnboarding
+                           
+                           // Check subscription status
+                           await self?.checkSubscriptionStatus()
+                           
+                       } catch {
+                           print("[ERROR] Failed to fetch user profile: \(error)")
+                           self?.error = error.localizedDescription
+                       }
+                   } else {
+                       self?.currentUser = nil
+                       self?.isAuthenticated = false
+                   }
+               }
+           }
+       }
+       
+        @MainActor
+        private func checkSubscriptionStatus() async {
+            guard let userId = currentUser?.id else { return }
+            do {
+                let status = try await FirebaseManager.shared.fetchSubscriptionStatus(userId: userId)
+                currentUser?.subscriptionStatus = status
+                
+                // Update StoreKit manager's state
+                if status.isSubscribed, let productId = status.productId {
+                    await MainActor.run {
+                        StoreKitManager.shared.purchasedProductIDs.insert(productId)
                     }
-                } else {
-                    self?.currentUser = nil
-                    self?.isAuthenticated = false
                 }
+            } catch {
+                print("[ERROR] Failed to check subscription status: \(error)")
             }
         }
-    }
+       
+       @MainActor
+       func updateSubscriptionStatus(_ status: User.SubscriptionStatus) async {
+           guard let userId = currentUser?.id else { return }
+           do {
+               try await FirebaseManager.shared.updateSubscriptionStatus(userId: userId, status: status)
+               currentUser?.subscriptionStatus = status
+           } catch {
+               self.error = error.localizedDescription
+           }
+       }
     
     @MainActor
     func signIn(email: String, password: String) async throws {

@@ -25,7 +25,10 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     @Published var experienceLevel: ExperienceLevel = .entry
     @Published var showingEndInterviewAlert = false
     @Published var showSubscriptionView = false
-        private let subscriptionManager = SubscriptionManager.shared
+    @Published var showFreeTrialAlert = false
+
+    
+    public let subscriptionManager = SubscriptionManager.shared
     private var isResetting = false
 
     // MARK: - Private Properties
@@ -98,69 +101,79 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     
     // MARK: - Interview Methods
     func startInterview() {
-        if !subscriptionManager.canUseInterview() {
-            showSubscriptionView = true
-            return
-        }
-        
-        subscriptionManager.useInterview()
-        
-        print("Start Interview button clicked")
+        Task { @MainActor in
+            print("\n=== START INTERVIEW ATTEMPT ===")
+           print("Current state: freeInterviews=\(subscriptionManager.freeInterviewsRemaining), subscribed=\(subscriptionManager.isSubscribed)")
+           
+           // Check subscription status first
+           if !subscriptionManager.canUseInterview() {
+               print("❌ Cannot use interview - showing subscription view")
+               showSubscriptionView = true
+               return
+           }
+           
+           // Use one interview from the free quota BEFORE starting the interview
+           print("🎯 Attempting to use interview")
+           await subscriptionManager.useInterview()
+           
+           // Double check after using interview
+           if !subscriptionManager.canUseInterview() {
+               print("❌ No more interviews available after use - showing subscription view")
+               showSubscriptionView = true
+               return
+           }
             
-        // Prevent starting new interview while resetting
-        guard !isResetting else {
-            print("Cannot start interview while resetting")
-            return
-        }
+            // Rest of your interview start code...
+            guard !isResetting else {
+                print("Cannot start interview while resetting")
+                return
+            }
+            
+            guard canStartInterview else {
+                print("Cannot start interview: jobTitle is empty or invalid")
+                return
+            }
+            
+            // Reset interview-specific state
+            interview = nil
+            currentResponse = ""
+            currentGeneratedContent = ""
+            
+            print("Starting interview setup...")
+            isLoading = true
+            currentState = .setup
         
-        guard canStartInterview else {
-            print("Cannot start interview: jobTitle is empty or invalid")
-            return
-        }
-        
-        // Reset interview-specific state
-        interview = nil
-        currentResponse = ""
-        currentGeneratedContent = ""
-        
-        print("Starting interview setup...")
-        isLoading = true
-        currentState = .setup
-        
-        let prompt = """
-        Generate exactly 6 interview questions for a \(jobTitle) position at \(experienceLevel.rawValue) level.
+            let prompt = """
+            Generate exactly 6 interview questions for a \(jobTitle) position at \(experienceLevel.rawValue) level.
 
-        Each question must be formatted exactly as shown below, with square brackets and a colon:
-        [Question Type]: Question text
+            Each question must be formatted exactly as shown below, with square brackets and a colon:
+            [Question Type]: Question text
 
-        Generate in this order:
-        1. [Behavioral]: First behavioral question
-        2. [Behavioral]: Second behavioral question
-        3. [Technical]: First technical question
-        4. [Technical]: Second technical question
-        5. [Situational]: First situational question
-        6. [Situational]: Second situational question
+            Generate in this order:
+            1. [Behavioral]: First behavioral question
+            2. [Behavioral]: Second behavioral question
+            3. [Technical]: First technical question
+            4. [Technical]: Second technical question
+            5. [Situational]: First situational question
+            6. [Situational]: Second situational question
 
-        Consider the following for \(experienceLevel.rawValue):
-        - Entry Level: Focus on fundamental knowledge and potential
-        - Mid Level: Balance technical skills with practical experience
-        - Senior Level: Include system design and leadership scenarios
-        - Lead/Manager: Focus on team management and strategic thinking
+            Consider the following for \(experienceLevel.rawValue):
+            - Entry Level: Focus on fundamental knowledge and potential
+            - Mid Level: Balance technical skills with practical experience
+            - Senior Level: Include system design and leadership scenarios
+            - Lead/Manager: Focus on team management and strategic thinking
 
-        Ensure questions are specifically tailored for a \(jobTitle) role at \(experienceLevel.rawValue) level.
-        Each question should be separated by a blank line.
-        """
-        
-        print("Prompt sent to Anthropic Service: \(prompt)") // Debug: Check if prompt is correctly formed
-        
-        Task {
+            Ensure questions are specifically tailored for a \(jobTitle) role at \(experienceLevel.rawValue) level.
+            Each question should be separated by a blank line.
+            """
+            
+            print("Prompt sent to Anthropic Service: \(prompt)") // Debug: Check if prompt is correctly formed
+            
             do {
                 try await anthropicService.generateStreamingResponse(for: prompt)
             } catch {
-                await MainActor.run {
-                    self.isLoading = false
-                    print("Error generating questions: \(error)")
-                }
+                self.isLoading = false
+                print("Error generating questions: \(error)")
             }
         }
     }

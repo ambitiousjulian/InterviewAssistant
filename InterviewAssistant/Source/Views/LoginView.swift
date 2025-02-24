@@ -207,6 +207,7 @@ struct LoginView: View {
             isLoading = false
         }
     }
+    
 }
 
 // Supporting Views
@@ -259,6 +260,7 @@ struct LoadingView: View {
             .cornerRadius(20)
         }
     }
+    
 }
 
 
