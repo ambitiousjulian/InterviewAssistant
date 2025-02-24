@@ -44,6 +44,12 @@ class SubscriptionManager: ObservableObject {
         }
     }
     
+    func reset() {
+        isSubscribed = false
+        freeInterviewsRemaining = 1
+        defaults.set(1, forKey: freeInterviewsKey)
+    }
+    
     @MainActor
    func useInterview() async {
        guard !isSubscribed && freeInterviewsRemaining > 0 else { return }

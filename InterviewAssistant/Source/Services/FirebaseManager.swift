@@ -344,4 +344,8 @@ class FirebaseManager {
             print("[WARNING] Failed to update deletion log: \(error.localizedDescription)")
         }
     }
+    
+    func verifyAndUpdateSubscriptionStatus(userId: String, status: User.SubscriptionStatus) async throws {
+        try await updateSubscriptionStatus(userId: userId, status: status)
+    }
 }

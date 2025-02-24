@@ -51,17 +51,15 @@ class AuthViewModel: ObservableObject {
                 let status = try await FirebaseManager.shared.fetchSubscriptionStatus(userId: userId)
                 currentUser?.subscriptionStatus = status
                 
-                // Update StoreKit manager's state
+                // Update StoreKit state
                 if status.isSubscribed, let productId = status.productId {
-                    await MainActor.run {
-                        StoreKitManager.shared.purchasedProductIDs.insert(productId)
-                    }
+                    StoreKitManager.shared.purchasedProductIDs.insert(productId)
                 }
             } catch {
                 print("[ERROR] Failed to check subscription status: \(error)")
             }
         }
-       
+           
        @MainActor
        func updateSubscriptionStatus(_ status: User.SubscriptionStatus) async {
            guard let userId = currentUser?.id else { return }

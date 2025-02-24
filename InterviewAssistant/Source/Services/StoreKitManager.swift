@@ -199,6 +199,24 @@ extension StoreKitManager {
     func product(for id: String) -> Product? {
         products.first(where: { $0.id == id })
     }
+    
+    func verifySubscription(productId: String) async -> Bool {
+        for await result in Transaction.all {
+            do {
+                let transaction = try checkVerified(result)
+                if transaction.productID == productId && transaction.revocationDate == nil {
+                    return true
+                }
+            } catch {
+                print("Failed to verify transaction: \(error)")
+            }
+        }
+        return false
+    }
+
+    func clearPurchases() {
+        purchasedProductIDs.removeAll()
+    }
 }
 
 enum StoreError: Error {

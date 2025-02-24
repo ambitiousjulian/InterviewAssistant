@@ -12,6 +12,7 @@ import Foundation
 import Vision
 import VisionKit
 import UIKit
+import FirebaseAuth
 
 class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelegate {
     // MARK: - Published Properties
@@ -103,27 +104,44 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     func startInterview() {
         Task { @MainActor in
             print("\n=== START INTERVIEW ATTEMPT ===")
-           print("Current state: freeInterviews=\(subscriptionManager.freeInterviewsRemaining), subscribed=\(subscriptionManager.isSubscribed)")
-           
-           // Check subscription status first
-           if !subscriptionManager.canUseInterview() {
-               print("❌ Cannot use interview - showing subscription view")
-               showSubscriptionView = true
-               return
-           }
-           
-           // Use one interview from the free quota BEFORE starting the interview
-           print("🎯 Attempting to use interview")
-           await subscriptionManager.useInterview()
-           
-           // Double check after using interview
-           if !subscriptionManager.canUseInterview() {
-               print("❌ No more interviews available after use - showing subscription view")
-               showSubscriptionView = true
-               return
-           }
             
-            // Rest of your interview start code...
+            // Check if user is logged in and has subscription
+            if let user = Auth.auth().currentUser {
+                do {
+                    let status = try await FirebaseManager.shared.fetchSubscriptionStatus(userId: user.uid)
+                    subscriptionManager.isSubscribed = status.isSubscribed
+                    subscriptionManager.freeInterviewsRemaining = status.freeInterviewsRemaining
+                    print("📱 User logged in - Subscription: \(status.isSubscribed), Free interviews: \(status.freeInterviewsRemaining)")
+                } catch {
+                    print("❌ Error fetching subscription status: \(error)")
+                }
+            } else {
+                print("👤 User not logged in - Using local subscription status")
+            }
+            
+            print("Current state: freeInterviews=\(subscriptionManager.freeInterviewsRemaining), subscribed=\(subscriptionManager.isSubscribed)")
+            
+            // Check if can use interview
+            if !subscriptionManager.canUseInterview() {
+                print("❌ Cannot use interview - showing subscription view")
+                showSubscriptionView = true
+                return
+            }
+            
+            // Use one interview if not subscribed
+            if !subscriptionManager.isSubscribed {
+                print("🎯 Using free interview")
+                await subscriptionManager.useInterview()
+                
+                // Check again after using interview
+                if !subscriptionManager.canUseInterview() {
+                    print("❌ No more interviews available - showing subscription view")
+                    showSubscriptionView = true
+                    return
+                }
+            }
+            
+            // Continue with interview
             guard !isResetting else {
                 print("Cannot start interview while resetting")
                 return
@@ -142,7 +160,7 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
             print("Starting interview setup...")
             isLoading = true
             currentState = .setup
-        
+            
             let prompt = """
             Generate exactly 6 interview questions for a \(jobTitle) position at \(experienceLevel.rawValue) level.
 
@@ -167,7 +185,7 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
             Each question should be separated by a blank line.
             """
             
-            print("Prompt sent to Anthropic Service: \(prompt)") // Debug: Check if prompt is correctly formed
+            print("Prompt sent to Anthropic Service: \(prompt)")
             
             do {
                 try await anthropicService.generateStreamingResponse(for: prompt)
