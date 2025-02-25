@@ -54,7 +54,7 @@ struct User: Codable, Identifiable, Equatable {
                 subscriptionId: nil,
                 expirationDate: nil,
                 productId: nil,
-                freeInterviewsRemaining: 1
+                freeInterviewsRemaining: 8
             )
         }
     }

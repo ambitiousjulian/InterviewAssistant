@@ -103,45 +103,14 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
     // MARK: - Interview Methods
     func startInterview() {
         Task { @MainActor in
-            print("\n=== START INTERVIEW ATTEMPT ===")
-            
-            // Check if user is logged in and has subscription
-            if let user = Auth.auth().currentUser {
-                do {
-                    let status = try await FirebaseManager.shared.fetchSubscriptionStatus(userId: user.uid)
-                    subscriptionManager.isSubscribed = status.isSubscribed
-                    subscriptionManager.freeInterviewsRemaining = status.freeInterviewsRemaining
-                    print("📱 User logged in - Subscription: \(status.isSubscribed), Free interviews: \(status.freeInterviewsRemaining)")
-                } catch {
-                    print("❌ Error fetching subscription status: \(error)")
-                }
-            } else {
-                print("👤 User not logged in - Using local subscription status")
-            }
-            
-            print("Current state: freeInterviews=\(subscriptionManager.freeInterviewsRemaining), subscribed=\(subscriptionManager.isSubscribed)")
-            
-            // Check if can use interview
-            if !subscriptionManager.canUseInterview() {
-                print("❌ Cannot use interview - showing subscription view")
+            // Check subscription status
+            let canProceed = await subscriptionManager.checkAndUpdateInterviewAvailability()
+            if !canProceed {
                 showSubscriptionView = true
                 return
             }
             
-            // Use one interview if not subscribed
-            if !subscriptionManager.isSubscribed {
-                print("🎯 Using free interview")
-                await subscriptionManager.useInterview()
-                
-                // Check again after using interview
-                if !subscriptionManager.canUseInterview() {
-                    print("❌ No more interviews available - showing subscription view")
-                    showSubscriptionView = true
-                    return
-                }
-            }
-            
-            // Continue with interview
+            // Basic checks
             guard !isResetting else {
                 print("Cannot start interview while resetting")
                 return
@@ -152,12 +121,10 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
                 return
             }
             
-            // Reset interview-specific state
+            // Start interview
             interview = nil
             currentResponse = ""
             currentGeneratedContent = ""
-            
-            print("Starting interview setup...")
             isLoading = true
             currentState = .setup
             

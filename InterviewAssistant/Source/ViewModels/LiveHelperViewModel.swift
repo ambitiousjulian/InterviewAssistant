@@ -19,6 +19,8 @@ class LiveHelperViewModel: ObservableObject {
     @Published var showError = false
     @Published var currentResponse = ""
     @Published var isStreaming = false
+    @Published var showSubscriptionView = false
+
     
     // MARK: - Private Properties
     private let anthropicService: AnthropicService
@@ -26,6 +28,7 @@ class LiveHelperViewModel: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    public let subscriptionManager = SubscriptionManager.shared
     private var currentUserId: String? {
         return Auth.auth().currentUser?.uid
     }
@@ -171,81 +174,87 @@ class LiveHelperViewModel: ObservableObject {
     }
     
     func processImage(_ image: UIImage) {
-        DispatchQueue.main.async {
-            self.isProcessing = true  // Set to true immediately when processing starts
-        }
-        
-        guard let cgImage = image.cgImage else {
-            DispatchQueue.main.async {
+        Task { @MainActor in
+            // Check subscription first
+            guard await checkSubscriptionAndProceed() else {
+                return
+            }
+            
+            self.isProcessing = true
+            
+            guard let cgImage = image.cgImage else {
                 self.isProcessing = false
                 self.handleError("Failed to process image")
+                return
             }
-            return
-        }
-        
-        let requestHandler = VNImageRequestHandler(cgImage: cgImage)
-        let request = VNRecognizeTextRequest { [weak self] request, error in
-            guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    self.isProcessing = false
-                    self.handleError("Text recognition failed: \(error.localizedDescription)")
-                    return
-                }
+            let requestHandler = VNImageRequestHandler(cgImage: cgImage)
+            let request = VNRecognizeTextRequest { [weak self] request, error in
+                guard let self = self else { return }
                 
-                guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                    self.isProcessing = false
-                    self.handleError("No text found in image")
-                    return
-                }
-                
-                let recognizedText = observations.compactMap { observation in
-                    observation.topCandidates(1).first?.string
-                }.joined(separator: " ")
-                
-                self.capturedText = recognizedText
-                if !recognizedText.isEmpty {
-                    self.processQuestion()
-                } else {
-                    self.isProcessing = false
-                    self.handleError("No text detected in image")
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self.isProcessing = false
+                        self.handleError("Text recognition failed: \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    guard let observations = request.results as? [VNRecognizedTextObservation] else {
+                        self.isProcessing = false
+                        self.handleError("No text found in image")
+                        return
+                    }
+                    
+                    let recognizedText = observations.compactMap { observation in
+                        observation.topCandidates(1).first?.string
+                    }.joined(separator: " ")
+                    
+                    self.capturedText = recognizedText
+                    if !recognizedText.isEmpty {
+                        self.processQuestion()
+                    } else {
+                        self.isProcessing = false
+                        self.handleError("No text detected in image")
+                    }
                 }
             }
-        }
-        
-        request.recognitionLevel = .accurate
-        
-        do {
-            try requestHandler.perform([request])
-        } catch {
-            DispatchQueue.main.async {
-                self.isProcessing = false
-                self.handleError("Failed to process image: \(error.localizedDescription)")
+            
+            request.recognitionLevel = .accurate
+            
+            do {
+                try requestHandler.perform([request])
+            } catch {
+                DispatchQueue.main.async {
+                    self.isProcessing = false
+                    self.handleError("Failed to process image: \(error.localizedDescription)")
+                }
             }
         }
     }
     
     // MARK: - Private Methods
     private func processQuestion() {
-        guard !capturedText.isEmpty else {
-            handleError("No question detected")
-            return
-        }
-        
-        isProcessing = true
-        currentResponse = ""
-        isStreaming = true
-        
-        Task {
+        Task { @MainActor in
+            guard !capturedText.isEmpty else {
+                handleError("No question detected")
+                return
+            }
+            
+            // Check subscription first
+            guard await checkSubscriptionAndProceed() else {
+                return
+            }
+            
+            isProcessing = true
+            currentResponse = ""
+            isStreaming = true
+            
             do {
                 try await anthropicService.generateStreamingResponse(for: capturedText)
             } catch {
-                await MainActor.run {
-                    self.handleError("Failed to generate response: \(error.localizedDescription)")
-                    self.isProcessing = false
-                    self.isStreaming = false
-                }
+                self.handleError("Failed to generate response: \(error.localizedDescription)")
+                self.isProcessing = false
+                self.isStreaming = false
             }
         }
     }
@@ -345,6 +354,22 @@ class LiveHelperViewModel: ObservableObject {
         }
     }
     
+    private func checkSubscriptionAndProceed() async -> Bool {
+        print("\n=== CHECKING LIVE HELPER AVAILABILITY ===")
+        
+        // Check subscription status
+        let canProceed = await subscriptionManager.checkAndUpdateInterviewAvailability()
+        if !canProceed {
+            print("❌ Cannot use Live Helper - showing subscription view")
+            await MainActor.run {
+                showSubscriptionView = true
+            }
+            return false
+        }
+
+        print("✅ Can proceed with Live Helper")
+        return true
+    }
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
