@@ -28,10 +28,12 @@ struct EULAView: View {
         """),
         
         ("3. Fees and Payments", """
-        Certain features of the App require payment:
-        • Free tier includes limited access to App features, such as three free live interview sessions
-        • Paid tier requires a fee of $5 per live session/hour or subscription plans as detailed in the App
-        • All fees are non-refundable except as required by law
+        App usage includes:
+        • Free Tier: 6-10 free AI responses per month, including mock interviews and live-interview help.
+        • Premium Plans:
+            ◦ Monthly Subscription: $3.99/month – Unlimited AI mock interviews and live-interview help
+        • Payments are non-refundable except as required by law.
+        For billing issues, contact info@cajcode.com.
         """),
         
         ("4. User Data", """
@@ -69,7 +71,7 @@ struct EULAView: View {
         
         ("11. Contact Information", """
         If you have questions about this Agreement, contact us at:
-        Email: support@cajcode.com
+        Email: info@cajcode.com
         """)
     ]
     
