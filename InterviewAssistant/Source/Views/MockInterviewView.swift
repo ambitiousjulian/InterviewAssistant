@@ -73,7 +73,7 @@ struct MockInterviewView: View {
                 if viewModel.currentState != .setup {
                     Button(action: {
                         withAnimation(.spring()) {
-                            viewModel.endInterview()
+                            viewModel.endInterviewAndCleanup()
                         }
                     }) {
                         Text("End Interview")
