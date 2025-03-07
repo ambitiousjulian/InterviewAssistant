@@ -4,6 +4,8 @@ import UIKit
 struct LiveHelperView: View {
     @StateObject private var viewModel = LiveHelperViewModel()
     @State private var isAnimating = false
+    @EnvironmentObject var authViewModel: AuthViewModel
+
     
     var body: some View {
         NavigationView {
@@ -72,6 +74,11 @@ struct LiveHelperView: View {
                 ImageCaptureView { image in
                     viewModel.processImage(image)
                 }
+            }
+            .sheet(isPresented: $viewModel.showSubscriptionView) {
+                SubscriptionView()
+                    .environmentObject(authViewModel)
+                    .interactiveDismissDisabled()
             }
             .alert("Error", isPresented: $viewModel.showError) {
                 Button("OK", role: .cancel) {

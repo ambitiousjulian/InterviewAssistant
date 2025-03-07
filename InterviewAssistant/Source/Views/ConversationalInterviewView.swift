@@ -12,6 +12,7 @@ import Speech
 
 struct ConversationalInterviewView: View {
     @StateObject private var viewModel = ConversationalInterviewViewModel()
+    @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var isAnimating = false
     @State private var pulseAnimation = false
@@ -66,6 +67,11 @@ struct ConversationalInterviewView: View {
         }
         .navigationTitle("Voice Interview")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $viewModel.showSubscriptionView) {
+            SubscriptionView()
+                .environmentObject(authViewModel)
+                .interactiveDismissDisabled()
+        }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

@@ -5,13 +5,16 @@
 //  Created by Julian Cajuste on 1/12/25.
 //
 import SwiftUI
+import FirebaseAuth
 
 struct MockInterviewView: View {
     @StateObject private var viewModel = MockInterviewViewModel()
+    @EnvironmentObject var authViewModel: AuthViewModel  
     @Environment(\.dismiss) private var dismiss
     @State private var isAnimating = false
     @FocusState private var isResponseFocused: Bool
-    
+    @State private var showFreeTrialAlert = false
+
     var body: some View {
         ZStack {
             // Enhanced Background
@@ -56,6 +59,12 @@ struct MockInterviewView: View {
                     }
                 }
             }
+        .onAppear {
+            // Check subscription status when view appears
+            if !viewModel.subscriptionManager.canUseInterview() {
+                viewModel.showSubscriptionView = true
+            }
+        }
         .navigationTitle("Mock Interview")
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -80,6 +89,20 @@ struct MockInterviewView: View {
                 }
             }
         }
+        .sheet(isPresented: $viewModel.showSubscriptionView) {
+            SubscriptionView()
+                .interactiveDismissDisabled()
+                .environmentObject(authViewModel)
+        }
+        .alert("Free Interviews Used", isPresented: $showFreeTrialAlert) {
+            Button("Subscribe Now") {
+                viewModel.showSubscriptionView = true
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("You've used all your free interviews. Subscribe to continue practicing!")
+        }
+
     }
    
     private var loadingMessage: String {
@@ -166,6 +189,10 @@ struct MockInterviewView: View {
                     // Modern Start Button
                     Button(action: {
                         isResponseFocused = false // Dismiss keyboard before starting
+                        if !viewModel.subscriptionManager.canUseInterview() {
+                            showFreeTrialAlert = true
+                            return
+                        }
                         withAnimation(.spring()) {
                             viewModel.startInterview()
                         }

@@ -64,7 +64,8 @@ class FirebaseManager {
                 id: result.user.uid,
                 email: email,
                 name: name,
-                resumeAnalysis: nil
+                resumeAnalysis: nil,
+                subscriptionStatus: User.SubscriptionStatus.defaultStatus
             )
             try await updateUserProfile(user)
             return user
@@ -95,7 +96,8 @@ class FirebaseManager {
                     id: firebaseUser.uid,
                     email: firebaseUser.email ?? "",
                     name: "",
-                    resumeAnalysis: nil
+                    resumeAnalysis: nil,
+                    subscriptionStatus: User.SubscriptionStatus.defaultStatus
                 )
                 try await updateUserProfile(newUser)
                 return newUser
@@ -173,10 +175,10 @@ class FirebaseManager {
             id: firebaseUser.uid,
             email: firebaseUser.email ?? "",
             name: firebaseUser.displayName ?? "",
-            resumeAnalysis: nil
+            resumeAnalysis: nil,
+            subscriptionStatus: User.SubscriptionStatus.defaultStatus 
         )
     }
-    
     // Main deletion method
     func deleteUserAccount(password: String) async throws {
         guard let currentUser = Auth.auth().currentUser,
@@ -212,6 +214,49 @@ class FirebaseManager {
             }
         }
     }
+    
+    func fetchSubscriptionStatus(userId: String) async throws -> User.SubscriptionStatus {
+            do {
+                let document = try await db.collection("users").document(userId).getDocument()
+                if let data = document.data()?["subscriptionStatus"] as? [String: Any] {
+                    return try Firestore.Decoder().decode(User.SubscriptionStatus.self, from: data)
+                }
+                return User.SubscriptionStatus.defaultStatus
+            } catch {
+                throw FirebaseError.unknownError(error.localizedDescription)
+            }
+        }
+        
+        func updateSubscriptionStatus(userId: String, status: User.SubscriptionStatus) async throws {
+            do {
+                let data = try Firestore.Encoder().encode(status)
+                try await db.collection("users").document(userId).updateData([
+                    "subscriptionStatus": data
+                ])
+            } catch {
+                throw FirebaseError.unknownError(error.localizedDescription)
+            }
+        }
+        
+        func decrementFreeInterviews(userId: String) async throws {
+            do {
+                try await db.collection("users").document(userId).updateData([
+                    "subscriptionStatus.freeInterviewsRemaining": FirebaseFirestore.FieldValue.increment(Int64(-1))
+                ])
+            } catch {
+                throw FirebaseError.unknownError(error.localizedDescription)
+            }
+        }
+
+        func resetFreeInterviews(userId: String) async throws {
+            do {
+                try await db.collection("users").document(userId).updateData([
+                    "subscriptionStatus.freeInterviewsRemaining": 1
+                ])
+            } catch {
+                throw FirebaseError.unknownError(error.localizedDescription)
+            }
+        }
     
     // Delete all user data from Firestore
     private func deleteAllUserData(userId: String) async throws {
@@ -298,5 +343,9 @@ class FirebaseManager {
         } catch {
             print("[WARNING] Failed to update deletion log: \(error.localizedDescription)")
         }
+    }
+    
+    func verifyAndUpdateSubscriptionStatus(userId: String, status: User.SubscriptionStatus) async throws {
+        try await updateSubscriptionStatus(userId: userId, status: status)
     }
 }
