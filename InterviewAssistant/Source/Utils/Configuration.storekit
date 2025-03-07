@@ -97,7 +97,7 @@
           ],
           "productID" : "nextjobai.premium",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Premium Subscription",
+          "referenceName" : "NextJob Ai premium",
           "subscriptionGroupID" : "DDF5570F",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
