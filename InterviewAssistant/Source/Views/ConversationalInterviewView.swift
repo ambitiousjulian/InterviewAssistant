@@ -363,28 +363,50 @@ struct ConversationalInterviewView: View {
                    
                     // Then replace the recording visualization section in voiceInterviewView with:
                     if viewModel.isListening && !viewModel.isAISpeaking {
-                        VStack(spacing: 12) {
-                            // Status indicator
-                            HStack(spacing: 6) {
+                        VStack(spacing: 32) {
+                            // Status Indicator
+                            HStack(spacing: 8) {
                                 Circle()
                                     .fill(Color.red)
-                                    .frame(width: 6, height: 6)
+                                    .frame(width: 8, height: 8)
                                     .opacity(audioMonitor.audioLevel > 0.1 ? 1 : 0.5)
                                     .scaleEffect(audioMonitor.audioLevel > 0.1 ? 1.2 : 1)
                                     .animation(.easeInOut(duration: 0.2), value: audioMonitor.audioLevel > 0.1)
                                 
-                                Text(audioMonitor.audioLevel > 0.1 ? "Listening" : "Waiting...")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.gray)
+                                Text(audioMonitor.audioLevel > 0.1 ? "Listening..." : "Waiting...")
+                                    .font(.headline)
+                                    .foregroundColor(AppTheme.purple)
                             }
-                            .padding(.top, 5)
                             
-                            // Wave animation
-                            AudioWaveView(audioLevel: CGFloat(audioMonitor.audioLevel))
-                                .frame(height: 50)
-                                .padding(.horizontal, 30)
+                            // Pulsating Recording Visualization in its own container
+                            ZStack {
+                                // Outer pulsating ring
+                                Circle()
+                                    .stroke(AppTheme.gradientStart.opacity(0.5), lineWidth: 4)
+                                    .frame(width: 120, height: 120)
+                                    .scaleEffect(1 + CGFloat(audioMonitor.audioLevel) * 0.5)
+                                    .opacity(1 - Double(audioMonitor.audioLevel))
+                                    .animation(.easeOut(duration: 0.5), value: audioMonitor.audioLevel)
+                                
+                                // Main recording button with mic icon
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Image(systemName: "mic.fill")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.white)
+                                    )
+                            }
+                            .frame(height: 140)  // Reserve sufficient vertical space for the pulsating circle
                             
-                            // Submit Button
+                            // Submit Button (stops recording)
                             if audioMonitor.audioLevel > 0.1 {
                                 Button(action: {
                                     withAnimation {
@@ -393,27 +415,27 @@ struct ConversationalInterviewView: View {
                                 }) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 16))
+                                            .font(.system(size: 18))
                                         Text("Submit")
-                                            .font(.system(size: 16, weight: .medium))
+                                            .font(.system(size: 18, weight: .semibold))
                                     }
-                                    .frame(width: 110)
-                                    .padding(.vertical, 10)
+                                    .frame(width: 140)
+                                    .padding(.vertical, 12)
                                     .background(
                                         LinearGradient(
-                                            colors: [Color.blue.opacity(0.9), Color.purple.opacity(0.9)],
+                                            colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )
                                     )
                                     .foregroundColor(.white)
-                                    .cornerRadius(20)
-                                    .shadow(color: Color.blue.opacity(0.15), radius: 4, y: 2)
+                                    .cornerRadius(25)
+                                    .shadow(color: Color.black.opacity(0.2), radius: 6, y: 3)
                                 }
                                 .transition(.scale.combined(with: .opacity))
-                                .padding(.top, 5)
                             }
                         }
+                        .padding(.top, 20)
                         .onAppear {
                             audioMonitor.startMonitoring()
                         }

@@ -162,6 +162,20 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
             }
         }
     }
+    
+    func endInterviewAndCleanup() {
+        // Stop any active audio monitoring if applicable.
+        // (Assuming you have an audio monitor reference. If it's in your view, consider notifying it.)
+        
+        // Cancel any ongoing network tasks if you have a cancellation mechanism.
+        
+        // Reset interview state.
+        reset()  // This clears all interview-related state.
+        
+        // Immediately go back to the setup screen.
+        currentState = .setup
+    }
+
 
     
     func submitResponse() {
@@ -261,14 +275,17 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
         }
         
         let questionsAndResponses = interview.questions.enumerated().map { index, question in
-            """
+            // Safely access the response for the current question
+            let candidateResponse = index < interview.responses.count ? interview.responses[index] : "NO RESPONSE"
+            return """
             Question \(index + 1) [\(question.type.rawValue)]:
             \(question.text)
             
             Candidate Response:
-            \(interview.responses[index])
+            \(candidateResponse)
             """
         }.joined(separator: "\n\n")
+
         
         // Debug print the full prompt being sent
         print("\nDEBUG: Full Analysis Prompt:")
@@ -356,7 +373,7 @@ class MockInterviewViewModel: NSObject, ObservableObject, AnthropicServiceDelega
         analyzeInterview()
         showingEndInterviewAlert = false
     }
-
+    
     func reset() {
         isResetting = true
         DispatchQueue.main.async {
